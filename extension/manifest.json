@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "LearnSense AI",
+  "version": "2.0.0",
+  "description": "Tracks LeetCode attempts locally and sends complete data to LearnSense only after an Accepted submission.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://leetcode.com/*",
+    "http://localhost:5000/*",
+    "https://api.learnsense.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LearnSense AI"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://leetcode.com/problems/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "page-inject.js"
+      ],
+      "matches": [
+        "https://leetcode.com/*"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: learnsense-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: learnsense-db
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_ACCESS_DAYS
+        value: "30"
+      - key: DASHBOARD_URL
+        sync: false
+      - key: DASHBOARD_ORIGIN
+        sync: false
+
+  - type: web
+    name: learnsense-dashboard
+    runtime: static
+    rootDir: dashboard
+    buildCommand: echo "No build step required"
+    staticPublishPath: .
+
+databases:
+  - name: learnsense-db
+    databaseName: learnsense
+    user: learnsense

@@ -69,6 +69,12 @@ if database_url.startswith("postgres://"):
         "postgresql+psycopg://",
         1,
     )
+elif database_url.startswith("postgresql://"):
+    database_url = database_url.replace(
+        "postgresql://",
+        "postgresql+psycopg://",
+        1,
+    )
 
 # Security configuration.
 jwt_secret = os.getenv("JWT_SECRET_KEY")

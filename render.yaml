@@ -26,9 +26,8 @@ services:
   - type: web
     name: learnsense-dashboard
     runtime: static
-    rootDir: dashboard
     buildCommand: echo "No build step required"
-    staticPublishPath: .
+    staticPublishPath: dashboard
     headers:
       - path: /*
         name: X-Frame-Options

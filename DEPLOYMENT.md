@@ -220,15 +220,22 @@ The dashboard is located in [`dashboard/`](file:///c:/Users/Sahil/Downloads/Lear
 ├──────────────────────┼─────────────────────────────────────────────────┤
 │ Name                 │ learnsense-dashboard                            │
 │ Branch               │ main (or master)                                │
-│ Root Directory       │ dashboard                                       │
+│ Root Directory       │ *(leave blank)*                                 │
 │ Build Command        │ echo 'No build step'                            │
-│ Publish Directory    │ .                                               │
+│ Publish Directory    │ dashboard                                       │
 └──────────────────────┴─────────────────────────────────────────────────┘
 ```
 
 4. Click **Create Static Site**.
 5. Render will deploy the static assets in under 30 seconds.
 6. Once deployed, copy your dashboard URL from the top of the screen (e.g., `https://learnsense-dashboard.onrender.com`).
+7. Verify both URLs before configuring the backend:
+   - `https://YOUR-DASHBOARD-URL.onrender.com/`
+   - `https://YOUR-DASHBOARD-URL.onrender.com/extension-login.html`
+
+   Both must show LearnSense pages, not Render's `Not Found` page. If either
+   URL returns `Not Found`, fix the static site's Publish Directory or use the
+   actual deployed service URL before continuing.
 
 ---
 

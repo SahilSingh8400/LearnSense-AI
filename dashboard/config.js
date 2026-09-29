@@ -9,6 +9,6 @@
   } else {
     // Production — API is served from the backend, not the static site.
     // *** CHANGE THIS to your Render backend URL ***
-    window.LEARNSENSE_API_BASE = 'https://learnsense-api.onrender.com/api';
+    window.LEARNSENSE_API_BASE = 'https://learnsense-ai.onrender.com/api';
   }
 })();

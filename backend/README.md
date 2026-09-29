@@ -30,5 +30,7 @@ A non-Accepted request is rejected with HTTP 400.
 
 Development defaults to SQLite. Set `DATABASE_URL` to PostgreSQL for production.
 
-The API creates its tables on startup for this prototype. For a production
-release, add Alembic/Flask-Migrate migrations before schema changes.
+The API creates missing tables on startup so a new Render PostgreSQL database
+can boot without a manual migration command. Keep schema changes backwards
+compatible and add a complete Flask-Migrate migration before changing the
+models in a future release.

@@ -82,6 +82,10 @@ if not jwt_secret:
     raise RuntimeError(
         "JWT_SECRET_KEY is required. Set a strong random value in production."
     )
+if os.getenv("FLASK_ENV", "production") == "production" and len(jwt_secret) < 32:
+    raise RuntimeError(
+        "JWT_SECRET_KEY must contain at least 32 characters in production."
+    )
 
 app.config.update(
     SQLALCHEMY_DATABASE_URI=database_url,
@@ -134,7 +138,18 @@ if not dashboard_origin:
         raise RuntimeError(
             "DASHBOARD_ORIGIN is required in production."
         )
-    dashboard_origin = "https://learnsense-ai.onrender.com/dashboard"
+    dashboard_origin = "http://localhost:3000"
+
+dashboard_origin = dashboard_origin.rstrip("/")
+parsed_dashboard_origin = urlparse(dashboard_origin)
+if (
+    parsed_dashboard_origin.scheme not in {"http", "https"}
+    or not parsed_dashboard_origin.netloc
+    or parsed_dashboard_origin.path not in {"", "/"}
+):
+    raise RuntimeError(
+        "DASHBOARD_ORIGIN must be an origin such as https://dashboard.example.com"
+    )
 
 # Allow both the dashboard origin and Chrome/Brave extension origins.
 # Chrome extensions send requests with Origin: chrome-extension://<id>.
@@ -147,7 +162,7 @@ def handle_cors_for_extensions(response):
     origin = request.headers.get("Origin", "")
     if (
         request.path.startswith("/api/")
-        and re.match(r"^chrome-extension://[a-z]+$", origin)
+        and re.match(r"^chrome-extension://[a-z0-9]{32}$", origin)
     ):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Headers"] = (
@@ -156,6 +171,7 @@ def handle_cors_for_extensions(response):
         response.headers["Access-Control-Allow-Methods"] = (
             "GET, POST, PUT, PATCH, DELETE, OPTIONS"
         )
+        response.headers.add("Vary", "Origin")
     return response
 
 CORS(
@@ -479,7 +495,7 @@ def valid_http_url(value):
         ):
             return True
 
-    except Exception:
+    except ValueError:
         pass
 
     return False
@@ -673,10 +689,23 @@ def create_dashboard_code():
     db.session.add(record)
     db.session.commit()
 
-    dashboard_url = os.getenv(
-        "DASHBOARD_URL",
-        "https://learnsense-ai.onrender.com/dashboard",
-    ).rstrip("/")
+    dashboard_url = os.getenv("DASHBOARD_URL")
+    if not dashboard_url:
+        dashboard_url = (
+            "http://localhost:3000"
+            if os.getenv("FLASK_ENV", "production") != "production"
+            else ""
+        )
+    dashboard_url = dashboard_url.rstrip("/")
+    parsed_dashboard_url = urlparse(dashboard_url)
+    if (
+        parsed_dashboard_url.scheme not in {"http", "https"}
+        or not parsed_dashboard_url.netloc
+        or parsed_dashboard_url.path not in {"", "/"}
+    ):
+        return jsonify({
+            "error": "Dashboard is not configured correctly."
+        }), 503
 
     return jsonify({
         "url": (

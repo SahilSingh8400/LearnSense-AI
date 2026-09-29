@@ -10,7 +10,28 @@
       options.headers || {},
     );
     if (token()) headers.Authorization = "Bearer " + token();
-    const r = await fetch(API + path, { ...options, headers });
+    let r = await fetch(API + path, { ...options, headers });
+    if (r.status === 401 && path !== "/auth/refresh") {
+      const refresh = localStorage.getItem("learnsense_refresh_token") || "";
+      if (refresh) {
+        const refreshResponse = await fetch(API + "/auth/refresh", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + refresh,
+          },
+        });
+        const refreshBody = await refreshResponse.json().catch(() => ({}));
+        if (refreshResponse.ok && refreshBody.access_token) {
+          localStorage.setItem(
+            "learnsense_access_token",
+            refreshBody.access_token,
+          );
+          headers.Authorization = "Bearer " + refreshBody.access_token;
+          r = await fetch(API + path, { ...options, headers });
+        }
+      }
+    }
     const b = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(b.error || "Request failed");
     return b;
@@ -93,6 +114,7 @@
       const b = await r.json();
       if (!r.ok) throw new Error(b.error || "Sign-in failed");
       localStorage.setItem("learnsense_access_token", b.access_token);
+      localStorage.setItem("learnsense_refresh_token", b.refresh_token || "");
       location.replace("index.html");
     } catch (e) {
       $("message").textContent = e.message;
@@ -103,6 +125,7 @@
   if ($("logout"))
     $("logout").onclick = function () {
       localStorage.removeItem("learnsense_access_token");
+      localStorage.removeItem("learnsense_refresh_token");
       location.href = "extension-login.html";
     };
   if (

@@ -69,7 +69,9 @@ The dashboard is static. From the `dashboard` directory run any static server, f
 python -m http.server 3000
 ```
 
-Open `http://localhost:5000/dashboard`.
+Open `http://localhost:3000`. The Flask-served `http://localhost:5000/dashboard`
+route is also available when the backend is running, but the static server
+matches the production layout.
 
 `dashboard/config.js` points to the local API by default.
 
@@ -83,16 +85,18 @@ Open `http://localhost:5000/dashboard`.
 
 ## Production deployment
 
-1. Deploy `backend` as a Render Web Service.
-2. Create a Render PostgreSQL database and set `DATABASE_URL`.
-3. Set a strong random `JWT_SECRET_KEY`.
-4. Deploy `dashboard` as a Render Static Site.
-5. Put the dashboard URL into backend `DASHBOARD_URL`.
-6. Put the dashboard origin into `DASHBOARD_ORIGIN`.
-7. Change `extension/config.js` to the production API URL.
-8. Add that API host to `manifest.json` and remove localhost before publishing.
-9. Change `dashboard/config.js` to the production API URL.
-10. Package the extension and publish/load the updated build.
+Follow [DEPLOYMENT.md](./DEPLOYMENT.md) in order. The important values are:
+
+| Component | Value to configure |
+| --- | --- |
+| Backend `DASHBOARD_URL` | Full dashboard origin, with no trailing slash |
+| Backend `DASHBOARD_ORIGIN` | Same dashboard origin, with no path |
+| `dashboard/config.js` | Backend URL ending in `/api` |
+| `extension/config.js` | Same backend URL ending in `/api` |
+| `extension/manifest.json` | Exact backend host in `host_permissions` |
+
+Do not publish the extension until the backend health check and dashboard
+sign-in flow both work over HTTPS.
 
 ## Important product behavior
 

@@ -6,7 +6,7 @@
   "permissions": ["storage"],
   "host_permissions": [
     "https://leetcode.com/*",
-    "https://*.onrender.com/*"
+    "https://learnsense-api.onrender.com/*"
   ],
   "background": {
     "service_worker": "background.js"

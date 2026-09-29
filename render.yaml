@@ -3,7 +3,7 @@ services:
     name: learnsense-api
     runtime: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt && python -c "from app import app, db; app.app_context().__enter__(); db.create_all()"
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
     envVars:
       - key: DATABASE_URL

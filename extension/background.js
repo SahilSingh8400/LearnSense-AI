@@ -14,14 +14,33 @@ function removeStorage(keys) {
 }
 
 async function request(path, options = {}) {
-  const stored = await getStorage(["authToken"]);
+  const stored = await getStorage(["authToken", "refreshToken"]);
   const headers = Object.assign(
     { "Content-Type": "application/json" },
     options.headers || {},
   );
   if (stored.authToken) headers.Authorization = "Bearer " + stored.authToken;
 
-  const response = await fetch(API_BASE + path, { ...options, headers });
+  let response = await fetch(API_BASE + path, { ...options, headers });
+  if (
+    response.status === 401 &&
+    stored.refreshToken &&
+    path !== "/auth/refresh"
+  ) {
+    const refreshResponse = await fetch(API_BASE + "/auth/refresh", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + stored.refreshToken,
+      },
+    });
+    const refreshBody = await refreshResponse.json().catch(() => ({}));
+    if (refreshResponse.ok && refreshBody.access_token) {
+      await setStorage({ authToken: refreshBody.access_token });
+      headers.Authorization = "Bearer " + refreshBody.access_token;
+      response = await fetch(API_BASE + path, { ...options, headers });
+    }
+  }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(body.error || "HTTP " + response.status);
@@ -97,12 +116,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
       if (message.action === "saveAuth") {
-        await setStorage({ authToken: message.token });
+        await setStorage({
+          authToken: message.token,
+          refreshToken: message.refreshToken || "",
+        });
         sendResponse({ ok: true });
         return;
       }
       if (message.action === "clearAuth") {
-        await removeStorage(["authToken"]);
+        await removeStorage(["authToken", "refreshToken"]);
         sendResponse({ ok: true });
         return;
       }

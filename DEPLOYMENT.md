@@ -136,17 +136,16 @@ Now, deploy the Python application inside [`backend/`](file:///c:/Users/Sahil/Do
 │ Branch               │ main (or master)                                │
 │ Root Directory       │ backend                                         │
 │ Runtime              │ Python 3                                        │
-│ Build Command        │ pip install -r requirements.txt && python -c    │
-│                      │ "from app import app, db;                       │
-│                      │ app.app_context().__enter__(); db.create_all()" │
+│ Build Command        │ pip install -r requirements.txt                 │
 │ Start Command        │ gunicorn --bind 0.0.0.0:$PORT app:app           │
 │ Instance Type        │ Free                                            │
 └──────────────────────┴─────────────────────────────────────────────────┘
 ```
 
 > [!NOTE]
-> **Why that Build Command?**
-> The build command installs Python dependencies and immediately initializes the PostgreSQL database tables via `db.create_all()` inside an application context. This ensures that the `users`, `problems`, `submissions`, and `dashboard_codes` tables are ready before the server accepts traffic.
+> The application creates missing tables when Gunicorn starts. The build step
+> must not import `app`, because production environment variables and the
+> database are not guaranteed to be available during the build.
 
 ---
 
@@ -160,7 +159,7 @@ Before deploying, scroll down to the **Environment Variables** section and add t
 | `FLASK_ENV` | `production` | Enables production security checks (e.g. strict CORS enforcement). |
 | `DASHBOARD_ORIGIN` | `https://placeholder.onrender.com` *(temporary)* | Domain allowed to access backend via CORS. We update this in Section 3. |
 | `DASHBOARD_URL` | `https://placeholder.onrender.com` *(temporary)* | Base URL used when redirecting the user to the web dashboard. |
-| `JWT_ACCESS_MINUTES`| `43200` *(Optional, 30 days)* | Keeps users logged in on the extension for 30 days. |
+| `JWT_ACCESS_MINUTES`| `1440` *(Optional, 1 day)* | Access-token lifetime; the extension refreshes it automatically using the refresh token. |
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -185,7 +184,7 @@ Before deploying, scroll down to the **Environment Variables** section and add t
 1. Click **Create Web Service**.
 2. Render will trigger the first build. Monitor the deploy logs:
    - You should see `pip install` installing dependencies like `Flask`, `SQLAlchemy`, `psycopg`, and `gunicorn`.
-   - You will see the database initialization script finish without errors.
+   - You will see Gunicorn start and the database health check become available.
    - Finally: `==> Your service is live 🎉`.
 3. Note your API URL at the top left of the page (e.g., `https://learnsense-api.onrender.com`).
 4. **Test the health check**: Open a new browser tab and visit:

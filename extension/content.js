@@ -245,17 +245,17 @@
     if (submissionInProgress) return;
     submissionInProgress = true;
 
+    var verdictPromise = watchForVerdict();
     requestCode()
       .then(function (codeResult) {
-        return watchForVerdict().then(function (verdict) {
+        return verdictPromise.then(function (verdict) {
           if (verdict) {
-            saveSubmission(verdict, codeResult.code, codeResult.lang).catch(
-              function (error) {
-                console.error("[LearnSense] Save failed:", error);
-              },
-            );
+            return saveSubmission(verdict, codeResult.code, codeResult.lang);
           }
         });
+      })
+      .catch(function (error) {
+        console.error("[LearnSense] Save failed:", error);
       })
       .finally(function () {
         setTimeout(function () {

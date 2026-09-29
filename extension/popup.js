@@ -123,7 +123,7 @@
     try {
       var result=await send({action:'apiRequest', path:mode==='signup'?'/auth/register':'/auth/login', options:{method:'POST',body:JSON.stringify({email:email,password:password,name:name})}});
       if (!result.ok) throw new Error(result.reason || 'Authentication failed');
-      await send({action:'saveAuth', token:result.data.access_token});
+      await send({action:'saveAuth', token:result.data.access_token, refreshToken:result.data.refresh_token});
       authMessage.textContent='';
       await checkAuth();
     } catch(e) { authMessage.textContent=e.message; }

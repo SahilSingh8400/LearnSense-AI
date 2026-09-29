@@ -134,13 +134,35 @@ if not dashboard_origin:
         raise RuntimeError(
             "DASHBOARD_ORIGIN is required in production."
         )
-    dashboard_origin = "http://localhost:5000"
+    dashboard_origin = "https://learnsense-ai.onrender.com/dashboard"
+
+# Allow both the dashboard origin and Chrome/Brave extension origins.
+# Chrome extensions send requests with Origin: chrome-extension://<id>.
+import re
+_allowed_origins = [dashboard_origin]
+
+@app.after_request
+def handle_cors_for_extensions(response):
+    """Allow Chrome extension origins for /api/* routes."""
+    origin = request.headers.get("Origin", "")
+    if (
+        request.path.startswith("/api/")
+        and re.match(r"^chrome-extension://[a-z]+$", origin)
+    ):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, Authorization"
+        )
+        response.headers["Access-Control-Allow-Methods"] = (
+            "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        )
+    return response
 
 CORS(
     app,
     resources={
         r"/api/*": {
-            "origins": dashboard_origin,
+            "origins": _allowed_origins,
             "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
         }
@@ -370,6 +392,14 @@ class DashboardCode(db.Model):
         db.DateTime(timezone=True),
         nullable=True,
     )
+
+
+# ============================================================
+# Create tables (safe on existing databases — only adds missing)
+# ============================================================
+
+with app.app_context():
+    db.create_all()
 
 
 # ============================================================
@@ -645,7 +675,7 @@ def create_dashboard_code():
 
     dashboard_url = os.getenv(
         "DASHBOARD_URL",
-        "http://localhost:5000/dashboard",
+        "https://learnsense-ai.onrender.com/dashboard",
     ).rstrip("/")
 
     return jsonify({

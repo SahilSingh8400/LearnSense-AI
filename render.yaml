@@ -3,8 +3,8 @@ services:
     name: learnsense-api
     runtime: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    buildCommand: pip install -r requirements.txt && python -c "from app import app, db; app.app_context().__enter__(); db.create_all()"
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -12,7 +12,11 @@ services:
           property: connectionString
       - key: JWT_SECRET_KEY
         generateValue: true
-      - key: JWT_ACCESS_DAYS
+      - key: FLASK_ENV
+        value: "production"
+      - key: JWT_ACCESS_MINUTES
+        value: "1440"
+      - key: JWT_REFRESH_DAYS
         value: "30"
       - key: DASHBOARD_URL
         sync: false
@@ -25,6 +29,10 @@ services:
     rootDir: dashboard
     buildCommand: echo "No build step required"
     staticPublishPath: .
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
 
 databases:
   - name: learnsense-db

@@ -12,6 +12,10 @@ attempt counters calculated by the browser extension:
 - `wrong_attempts`
 - `total_attempts`
 
+The extension supports LeetCode, CodeChef, and HackerRank. The existing
+submission schema remains platform-neutral; the problem URL identifies the
+source website.
+
 A non-Accepted request is rejected with HTTP 400.
 
 ## Main endpoints

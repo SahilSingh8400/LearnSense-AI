@@ -1,68 +1,98 @@
-// page-inject.js
-//
-// This file is loaded with a <script src="..."> tag by content.js, which
-// means it runs in the PAGE's own JavaScript context (the "main world"),
-// not the isolated content-script sandbox. That's the only place
-// `window.monaco` (LeetCode's code editor instance) actually exists, so
-// it's the only place we can reliably pull the full, current contents of
-// the editor - reading the DOM directly would miss lines that Monaco
-// hasn't rendered yet (it virtualizes long files).
-//
-// It talks to content.js purely via window.postMessage, since the two
-// worlds cannot call each other's functions directly.
-
+// Runs in the page context so editor APIs and DOM state are available.
 (function () {
-  'use strict';
+  "use strict";
+  var SOURCE_PAGE = "lc-tracker-page";
+  var SOURCE_CONTENT = "lc-tracker-content";
 
-  var SOURCE_PAGE = 'lc-tracker-page';
-  var SOURCE_CONTENT = 'lc-tracker-content';
+  function languageFromPage() {
+    var select = document.querySelector(
+      "select[name*='language' i], select[id*='language' i], [data-testid*='language' i]"
+    );
+    return select ? (select.value || select.textContent || "").trim() : "";
+  }
 
   function getEditorCode() {
-    // Preferred path: ask Monaco directly for the model's text. This is
-    // complete and accurate regardless of scroll position.
     try {
       if (window.monaco && window.monaco.editor) {
         var models = window.monaco.editor.getModels();
         if (models && models.length) {
           var model = models[0];
+          for (var modelIndex = 1; modelIndex < models.length; modelIndex++) {
+            if (models[modelIndex].getValue().length > model.getValue().length) {
+              model = models[modelIndex];
+            }
+          }
           return {
             code: model.getValue(),
-            lang: typeof model.getLanguageId === 'function' ? model.getLanguageId() : ''
+            lang: typeof model.getLanguageId === "function" ? model.getLanguageId() : languageFromPage(),
           };
         }
       }
-    } catch (err) {
-      // fall through to the DOM fallback below
+    } catch (error) {
+      console.warn("[LearnSense] Monaco code extraction failed:", error);
     }
 
-    // Fallback: scrape whatever Monaco currently has painted to the DOM.
-    // Only used if window.monaco isn't reachable for some reason (e.g.
-    // LeetCode changes how the editor is bundled). This can be INCOMPLETE
-    // for long solutions because Monaco only renders visible lines.
-    try {
-      var lineEls = document.querySelectorAll('.view-line');
-      if (lineEls && lineEls.length) {
-        var text = Array.prototype.map
-          .call(lineEls, function (el) { return el.textContent; })
-          .join('\n');
-        return { code: text, lang: '' };
+    var codeMirrorContainer = document.querySelector(".CodeMirror");
+    if (codeMirrorContainer && codeMirrorContainer.CodeMirror &&
+        typeof codeMirrorContainer.CodeMirror.getValue === "function") {
+      return {
+        code: codeMirrorContainer.CodeMirror.getValue(),
+        lang: languageFromPage(),
+      };
+    }
+
+    var codeMirror = document.querySelector(".CodeMirror textarea, textarea[data-testid*='code' i]");
+    if (codeMirror && typeof codeMirror.value === "string") {
+      return { code: codeMirror.value, lang: languageFromPage() };
+    }
+
+    var textareas = document.querySelectorAll("textarea");
+    for (var textareaIndex = 0; textareaIndex < textareas.length; textareaIndex++) {
+      if (textareas[textareaIndex].value) {
+        return { code: textareas[textareaIndex].value, lang: languageFromPage() };
       }
-    } catch (err2) {
-      // ignore
     }
 
-    return { code: '', lang: '' };
+    try {
+      if (window.ace && typeof window.ace.edit === "function") {
+        var aceEditors = document.querySelectorAll(".ace_editor");
+        for (var editorIndex = 0; editorIndex < aceEditors.length; editorIndex++) {
+          var aceEditor = window.ace.edit(aceEditors[editorIndex]);
+          var aceCode = aceEditor.getValue();
+          if (aceCode) return { code: aceCode, lang: languageFromPage() };
+        }
+      }
+    } catch (aceError) {
+      console.warn("[LearnSense] Ace code extraction failed:", aceError);
+    }
+
+    var cm6 = document.querySelector(".cm-editor");
+    if (cm6) {
+      var cmView = cm6.cmView || cm6.view || cm6.editorView;
+      if (cmView && cmView.state && cmView.state.doc) {
+        return { code: cmView.state.doc.toString(), lang: languageFromPage() };
+      }
+    }
+
+    var aceLines = document.querySelectorAll(".ace_text-layer .ace_line");
+    if (aceLines.length) {
+      return {
+        code: Array.prototype.map.call(aceLines, function (line) { return line.textContent; }).join("\n"),
+        lang: languageFromPage(),
+      };
+    }
+
+    var editable = document.querySelector("[contenteditable='true']");
+    if (editable) return { code: editable.innerText || editable.textContent || "", lang: languageFromPage() };
+    return { code: "", lang: languageFromPage() };
   }
 
-  window.addEventListener('message', function (event) {
-    if (event.source !== window) return;
-    var data = event.data;
-    if (!data || data.source !== SOURCE_CONTENT || data.type !== 'GET_CODE') return;
-
+  window.addEventListener("message", function (event) {
+    if (event.source !== window || !event.data ||
+        event.data.source !== SOURCE_CONTENT || event.data.type !== "GET_CODE") return;
     var result = getEditorCode();
-    window.postMessage(
-      { source: SOURCE_PAGE, type: 'CODE_VALUE', code: result.code, lang: result.lang },
-      '*'
-    );
+    window.postMessage({
+      source: SOURCE_PAGE, type: "CODE_VALUE", code: result.code, lang: result.lang,
+    }, "*");
   });
 })();

@@ -769,8 +769,8 @@ def create_submission():
     """
     Accept only successful submissions.
 
-    The extension sends the counters calculated from the user's
-    LeetCode activity.
+    The extension sends the counters calculated from the user's activity on
+    a supported coding platform.
     """
 
     data = request.get_json(silent=True) or {}

@@ -81,7 +81,22 @@ matches the production layout.
 2. Enable Developer mode.
 3. Load unpacked.
 4. Select the `extension` folder.
-5. Open LeetCode and solve a problem.
+5. Open LeetCode, CodeChef, or HackerRank and solve a problem.
+
+### Supported coding websites
+
+The extension tracks attempts on:
+
+- LeetCode (`leetcode.com`)
+- CodeChef (`codechef.com`)
+- HackerRank (`hackerrank.com`)
+
+Click the site's submit button. Every recognized result is stored locally in
+the popup. Accepted submissions include the problem URL, platform-specific
+problem slug, language, editor contents, and attempt counters when they are
+synced to the backend. The extension recognizes each site's common accepted,
+wrong-answer, time-limit, memory-limit, runtime, compile, and internal-error
+result labels.
 
 ## Production deployment
 

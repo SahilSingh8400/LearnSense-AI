@@ -1,310 +1,587 @@
 * {
   box-sizing: border-box;
 }
+
 body {
   margin: 0;
   width: 520px;
   min-height: 560px;
-  background: #0b1020;
-  color: #e8ecf5;
+
+  /* Main background */
+  background: #0b1120;
+  color: #f8fafc;
+
   font-family:
     Inter,
     Segoe UI,
     Arial,
     sans-serif;
 }
+
 .hidden {
   display: none !important;
 }
+
+/* =========================
+   TOP BAR
+========================= */
+
 .topbar {
   display: flex;
   gap: 12px;
   align-items: center;
+
   padding: 18px 20px;
-  border-bottom: 1px solid #202942;
-  background: #11172a;
+
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
 }
+
 .mark {
   width: 38px;
   height: 30px;
+
   border-radius: 10px;
+
   display: grid;
   place-items: center;
+
   color: white;
+
   margin-right: 10px;
   margin-bottom: 10px;
+
   font-weight: 800;
 }
+
 .topbar h1 {
   font-size: 17px;
   margin: 0;
 }
+
 .topbar p {
   font-size: 11px;
-  color: #8994ad;
+  color: #94a3b8;
   margin: 3px 0 0;
 }
+
+/* =========================
+   AUTH
+========================= */
+
 .auth-panel {
   padding: 20px;
 }
+
 .auth-tabs {
   display: flex;
   gap: 6px;
   margin-bottom: 14px;
 }
+
 .tab {
   flex: 1;
-  background: #171e33;
-  border: 1px solid #2a3552;
-  color: #9ca7c0;
+
+  background: #111827;
+  border: 1px solid #1e293b;
+
+  color: #94a3b8;
+
   padding: 9px;
+
   border-radius: 8px;
   cursor: pointer;
+
+  transition: 0.2s ease;
 }
+
+.tab:hover {
+  border-color: #06b6d4;
+  color: #e2e8f0;
+}
+
 .tab.active {
-  background: #252e4b;
-  color: #fff;
+  background: #164e63;
+  border-color: #0891b2;
+  color: #f8fafc;
 }
+
 .auth-panel input {
   width: 100%;
+
   margin: 6px 0;
   padding: 11px 12px;
-  background: #0f1528;
-  border: 1px solid #293550;
+
+  background: #0f172a;
+  border: 1px solid #334155;
+
   border-radius: 8px;
-  color: #fff;
+
+  color: #f8fafc;
   outline: none;
+
+  transition: 0.2s ease;
 }
+
+.auth-panel input:focus {
+  border-color: #06b6d4;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.12);
+}
+
+/* =========================
+   BUTTONS
+========================= */
+
 .primary-btn {
   border: 0;
   border-radius: 8px;
+
   padding: 10px 14px;
-  background: #6d5dfc;
-  color: white;
+
+  background: #06b6d4;
+  color: #082f49;
+
   font-weight: 700;
+
   cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
 }
+
+.primary-btn:hover {
+  background: #22d3ee;
+}
+
+.primary-btn:active {
+  transform: scale(0.98);
+}
+
 .auth-panel .primary-btn {
   width: 100%;
   margin-top: 8px;
 }
+
 .message,
 .sync-status {
   font-size: 11px;
-  color: #f0a5a5;
+  color: #fca5a5;
+
   margin-top: 8px;
   min-height: 15px;
 }
+
+/* =========================
+   ACCOUNT
+========================= */
+
 .account-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+
   padding: 12px 18px;
-  border-bottom: 1px solid #202942;
+
+  border-bottom: 1px solid #1e293b;
 }
+
 .account-row strong {
   display: block;
+
   font-size: 12px;
   margin-top: 3px;
 }
+
 .muted {
-  font-size: 10px;
-  color: #74809b;
+  font-size: 15px;
+  color: #64748b;
 }
+
+#userName {
+  font-size: 18px;
+  color: #f8fafc;
+}
+
 .text-btn {
   border: 0;
   background: none;
-  color: #8994ad;
+
+  color: #94a3b8;
+
   cursor: pointer;
   font-size: 11px;
+
+  transition: 0.2s ease;
 }
+
+.text-btn:hover {
+  color: #22d3ee;
+}
+
+/* =========================
+   STATISTICS
+========================= */
+
 .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+
   gap: 8px;
+
   padding: 14px 18px;
 }
+
 .stat {
-  background: #121a2e;
-  border: 1px solid #222d48;
+  background: #111827;
+
+  border: 1px solid #1e293b;
+
   border-radius: 10px;
+
   padding: 12px;
+
   text-align: center;
+
+  transition: 0.2s ease;
 }
+
+.stat:hover {
+  border-color: #334155;
+}
+
 .stat-value {
   font-size: 22px;
   font-weight: 800;
 }
+
 .stat-value.correct {
-  color: #58d68d;
+  color: #34d399;
 }
+
 .stat-value.wrong {
-  color: #ff7373;
+  color: #fb7185;
 }
+
 .stat-label {
   display: block;
+
   font-size: 10px;
-  color: #7f8ba5;
+
+  color: #94a3b8;
+
   margin-top: 3px;
 }
+
+/* =========================
+   PROBLEM SUMMARY
+========================= */
+
 .problem-summary {
   padding: 0 18px 12px;
 }
+
 .section-title {
   font-size: 11px;
   font-weight: 700;
-  color: #aeb8ce;
+
+  color: #cbd5e1;
+
   margin-bottom: 7px;
 }
+
 .problem-stats {
   display: grid;
   gap: 5px;
 }
+
 .problem-row {
   display: flex;
   justify-content: space-between;
+
   gap: 8px;
+
   padding: 8px 10px;
-  background: #11182a;
-  border: 1px solid #202a43;
+
+  background: #0f172a;
+
+  border: 1px solid #1e293b;
+
   border-radius: 7px;
+
+  transition: 0.2s ease;
 }
+
+.problem-row:hover {
+  border-color: #334155;
+  background: #111c31;
+}
+
 .problem-name {
   font-size: 11px;
+
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  color: #e2e8f0;
 }
+
 .problem-result {
   display: flex;
+
   gap: 8px;
+
   white-space: nowrap;
+
   font-size: 10px;
-  color: #8994ad;
+
+  color: #94a3b8;
 }
+
 .p-correct {
-  color: #58d68d;
+  color: #34d399;
 }
+
 .p-wrong {
-  color: #ff7373;
+  color: #fb7185;
 }
+
 .problem-empty {
   font-size: 11px;
-  color: #66728b;
+
+  color: #64748b;
+
   padding: 8px;
 }
+
+/* =========================
+   WORKSPACE
+========================= */
+
 .workspace {
   display: grid;
+
   grid-template-columns: 180px 1fr;
+
   height: 270px;
+
   margin: 0 18px;
-  border: 1px solid #222d48;
+
+  border: 1px solid #1e293b;
+
   border-radius: 9px;
+
   overflow: hidden;
 }
+
+/* =========================
+   HISTORY
+========================= */
+
 .history {
   overflow: auto;
-  background: #0e1527;
-  border-right: 1px solid #222d48;
+
+  background: #0f172a;
+
+  border-right: 1px solid #1e293b;
 }
+
 .history-item {
   width: 100%;
+
   display: flex;
+
   gap: 7px;
+
   align-items: center;
+
   text-align: left;
+
   border: 0;
-  border-bottom: 1px solid #1b253d;
+
+  border-bottom: 1px solid #1e293b;
+
   background: transparent;
-  color: #aeb8ca;
+
+  color: #94a3b8;
+
   padding: 9px;
+
   cursor: pointer;
+
   font-size: 10px;
+
+  transition: 0.2s ease;
 }
+
+.history-item:hover {
+  background: #111c31;
+  color: #e2e8f0;
+}
+
 .history-item.active {
-  background: #1b2540;
-  color: #fff;
+  background: #164e63;
+
+  color: #f8fafc;
+
+  border-left: 2px solid #06b6d4;
 }
+
+/* =========================
+   STATUS DOT
+========================= */
+
 .dot {
   width: 7px;
   height: 7px;
+
   border-radius: 50%;
+
   flex: none;
 }
+
 .dot.ok {
-  background: #58d68d;
+  background: #34d399;
+
+  box-shadow: 0 0 5px rgba(52, 211, 153, 0.5);
 }
+
 .dot.bad {
-  background: #ff7373;
+  background: #fb7185;
+
+  box-shadow: 0 0 5px rgba(251, 113, 133, 0.4);
 }
+
 .h-title {
   overflow: hidden;
+
   text-overflow: ellipsis;
+
   white-space: nowrap;
 }
+
+/* =========================
+   CODE PANEL
+========================= */
+
 .code-panel {
   min-width: 0;
-  background: #0a1020;
+
+  background: #0b1120;
 }
+
 .code-header {
   padding: 10px;
-  border-bottom: 1px solid #202942;
+
+  border-bottom: 1px solid #1e293b;
+
+  background: #0f172a;
 }
+
 .code-header-row {
   display: flex;
+
   justify-content: space-between;
+
   gap: 8px;
+
   align-items: center;
 }
+
 .code-title {
   font-size: 11px;
+
   font-weight: 700;
+
   overflow: hidden;
+
   text-overflow: ellipsis;
+
   white-space: nowrap;
+
+  color: #f1f5f9;
 }
+
 .code-time {
   font-size: 9px;
-  color: #66728b;
+
+  color: #64748b;
 }
+
 .verdict {
   font-size: 10px;
 }
+
 .verdict.ok {
-  color: #58d68d;
+  color: #34d399;
 }
+
 .verdict.bad {
-  color: #ff7373;
+  color: #fb7185;
 }
+
+/* =========================
+   CODE VIEW
+========================= */
+
 .code-view {
   height: 220px;
+
   overflow: auto;
+
   padding: 10px;
+
   font-family: Consolas, monospace;
+
   font-size: 10px;
+
   line-height: 1.55;
-  color: #cbd3e4;
+
+  color: #cbd5e1;
+
   white-space: pre;
+
+  background: #0b1120;
 }
+
 .code-line {
   min-height: 15px;
 }
+
+/* =========================
+   EMPTY STATES
+========================= */
+
 .empty,
 .empty-note {
   padding: 12px;
-  color: #66728b;
+
+  color: #64748b;
+
   font-size: 10px;
 }
+
+/* =========================
+   BOTTOM ACTIONS
+========================= */
+
 .bottom-actions {
   display: flex;
+
   align-items: center;
+
   gap: 12px;
+
   padding: 14px 18px;
 }
+
 .bottom-actions .primary-btn {
   flex: 1;
 }
+
 .sync-status {
   padding: 0 18px 10px;
-  color: #7f8ba5;
+
+  color: #94a3b8;
 }

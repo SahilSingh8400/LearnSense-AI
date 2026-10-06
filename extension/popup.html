@@ -1,64 +1,105 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LearnSense AI</title>
-  <link rel="stylesheet" href="popup.css" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="mark">&lt;/&gt;</div>
-    <div><h1>LearnSense AI</h1><p>LeetCode learning tracker</p></div>
-  </header>
-
-  <div class="bottom-actions">
-    <button id="dashboardBtn" class="primary-btn">View Dashboard</button>
-    <button id="resetBtn" class="text-btn">Reset local</button>
-  </div>
-  <section id="authPanel" class="auth-panel">
-    <div class="auth-tabs">
-      <button id="loginTab" class="tab active">Login</button>
-      <button id="signupTab" class="tab">Sign up</button>
-    </div>
-    <input id="nameInput" class="hidden" type="text" placeholder="Name" autocomplete="name" />
-    <input id="emailInput" type="email" placeholder="Email" autocomplete="email" />
-    <input id="passwordInput" type="password" placeholder="Password (8+ characters)" autocomplete="current-password" />
-    <button id="authBtn" class="primary-btn">Login</button>
-    <div id="authMessage" class="message"></div>
-  </section>
-
-  <main id="appPanel" class="hidden">
-    <section class="account-row">
-      <div><span class="muted">Signed in as</span><strong id="userEmail">—</strong></div>
-      <button id="logoutBtn" class="text-btn">Logout</button>
-    </section>
-
-    <section class="stats" aria-label="Local attempt statistics">
-      <div class="stat"><span class="stat-value correct" id="correctCount">0</span><span class="stat-label">Correct</span></div>
-      <div class="stat"><span class="stat-value wrong" id="wrongCount">0</span><span class="stat-label">Wrong</span></div>
-      <div class="stat"><span class="stat-value" id="accuracyValue">0%</span><span class="stat-label">Accuracy</span></div>
-    </section>
-
-    <section class="problem-summary">
-      <div class="section-title">Recent question stats</div>
-      <div id="problemStats" class="problem-stats"></div>
-    </section>
-
-    <section class="workspace">
-      <nav class="history" id="history" aria-label="Submission history"></nav>
-      <div class="code-panel">
-        <div class="code-header">
-          <div class="code-header-row"><span class="code-title" id="codeTitle">No submissions yet</span><button id="copyBtn" class="text-btn">Copy</button></div>
-          <div class="code-header-row"><span class="verdict" id="codeVerdict"></span><span class="code-time" id="codeTime"></span></div>
-        </div>
-        <div class="code-view" id="codeView"><p class="empty-note">Solve a problem on LeetCode and hit Submit.</p></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LearnSense AI</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="mark"><img src="./icons/icon48.png" /></div>
+      <div>
+        <h1>LearnSense AI</h1>
+        <p>LeetCode learning tracker</p>
       </div>
+    </header>
+
+    <div class="bottom-actions">
+      <button id="dashboardBtn" class="primary-btn">View Dashboard</button>
+      <button id="resetBtn" class="text-btn">Reset local</button>
+    </div>
+    <section id="authPanel" class="auth-panel">
+      <div class="auth-tabs">
+        <button id="loginTab" class="tab active">Login</button>
+        <button id="signupTab" class="tab">Sign up</button>
+      </div>
+      <input
+        id="nameInput"
+        class="hidden"
+        type="text"
+        placeholder="Name"
+        autocomplete="name"
+      />
+      <input
+        id="emailInput"
+        type="email"
+        placeholder="Email"
+        autocomplete="email"
+      />
+      <input
+        id="passwordInput"
+        type="password"
+        placeholder="Password (8+ characters)"
+        autocomplete="current-password"
+      />
+      <button id="authBtn" class="primary-btn">Login</button>
+      <div id="authMessage" class="message"></div>
     </section>
 
-    <div id="syncStatus" class="sync-status"></div>
-  </main>
+    <main id="appPanel" class="hidden">
+      <section class="account-row">
+        <div>
+          <span class="muted">Signed in as</span
+          ><strong id="userName">—</strong>
+        </div>
+        <button id="logoutBtn" class="text-btn">Logout</button>
+      </section>
 
-  <script src="popup.js"></script>
-</body>
+      <section class="stats" aria-label="Local attempt statistics">
+        <div class="stat">
+          <span class="stat-value correct" id="correctCount">0</span
+          ><span class="stat-label">Correct</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value wrong" id="wrongCount">0</span
+          ><span class="stat-label">Wrong</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="accuracyValue">0%</span
+          ><span class="stat-label">Accuracy</span>
+        </div>
+      </section>
+
+      <section class="problem-summary">
+        <div class="section-title">Recent question stats</div>
+        <div id="problemStats" class="problem-stats"></div>
+      </section>
+
+      <section class="workspace">
+        <nav class="history" id="history" aria-label="Submission history"></nav>
+        <div class="code-panel">
+          <div class="code-header">
+            <div class="code-header-row">
+              <span class="code-title" id="codeTitle">No submissions yet</span
+              ><button id="copyBtn" class="text-btn">Copy</button>
+            </div>
+            <div class="code-header-row">
+              <span class="verdict" id="codeVerdict"></span
+              ><span class="code-time" id="codeTime"></span>
+            </div>
+          </div>
+          <div class="code-view" id="codeView">
+            <p class="empty-note">
+              Solve a problem on LeetCode and hit Submit.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div id="syncStatus" class="sync-status"></div>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
 </html>

@@ -290,8 +290,11 @@ header p {
 
 .table-wrap {
   width: 100%;
-
   overflow-x: auto;
+  overflow-y: auto;
+
+  /* Fixed height */
+  max-height: 420px;
 }
 
 table {
@@ -400,14 +403,11 @@ pre {
 
 .ai-panel {
   background: #0e1527;
-
   border: 1px solid #202b45;
-
   border-radius: 13px;
-
   overflow: hidden;
 
-  min-height: 560px;
+  min-height: 750px;
 }
 
 

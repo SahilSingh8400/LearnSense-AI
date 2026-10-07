@@ -90,9 +90,19 @@
     try {
       const d = await api("/problems/" + encodeURIComponent(slug));
       const s = d.submissions[0];
+
       $("solutionMeta").textContent =
         d.problem.title + " · " + s.language + " · " + fmt(s.submitted_at);
+
       $("code").textContent = s.code || "(empty code)";
+
+      // Automatically scroll to the submitted code
+      setTimeout(() => {
+        $("acceptedSolution").scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 100);
     } catch (e) {
       $("solutionMeta").textContent = e.message;
     }

@@ -2,43 +2,32 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>LearnSense AI Dashboard</title>
-    <link rel="icon" type="image/png" href="../extension/icons/icon16.png">
+    <link rel="icon" type="image/png" href="icons/icon48.png" />
 
     <link rel="stylesheet" href="style.css" />
   </head>
 
   <body>
     <div class="app">
-
       <!-- HEADER -->
       <header>
         <div>
-          <div class="brand">
-            LearnSense <span>AI</span>
-          </div>
+          <div class="brand">LearnSense <span>AI</span></div>
 
           <p>Learning analytics for your LeetCode practice</p>
         </div>
 
-        <button id="logout" class="ghost">
-          Logout
-        </button>
+        <button id="logout" class="ghost">Logout</button>
       </header>
-
 
       <!-- MAIN TWO COLUMN DASHBOARD -->
       <main class="dashboard-grid">
-
         <!-- ================= LEFT COLUMN ================= -->
 
         <div class="left-column">
-
           <!-- LEARNING REPORT -->
           <section class="hero">
             <div>
@@ -46,15 +35,11 @@
               <p id="user">Loading account...</p>
             </div>
 
-            <button id="refresh" class="primary">
-              Refresh
-            </button>
+            <button id="refresh" class="primary">Refresh</button>
           </section>
-
 
           <!-- STATISTICS -->
           <section class="cards">
-
             <div class="card">
               <span>Solved problems</span>
               <strong id="solved">0</strong>
@@ -74,13 +59,10 @@
               <span>Accuracy</span>
               <strong id="accuracy">0%</strong>
             </div>
-
           </section>
-
 
           <!-- PROBLEM PERFORMANCE -->
           <section class="panel">
-
             <div class="panel-head">
               <h2>Problem performance</h2>
 
@@ -88,9 +70,7 @@
             </div>
 
             <div class="table-wrap">
-
               <table>
-
                 <thead>
                   <tr>
                     <th>Problem</th>
@@ -102,89 +82,57 @@
                   </tr>
                 </thead>
 
-                <tbody id="problems">
-                </tbody>
-
+                <tbody id="problems"></tbody>
               </table>
-
             </div>
-
           </section>
 
-
           <!-- ACCEPTED SOLUTION -->
-          <section class="panel">
-
+           
+          <section class="panel" id="acceptedSolution">
             <div class="panel-head">
-
               <h2>Accepted solution</h2>
 
               <span id="solutionMeta"></span>
-
             </div>
 
             <pre id="code">Select a problem above.</pre>
-
           </section>
-
         </div>
-
 
         <!-- ================= RIGHT COLUMN ================= -->
 
         <div class="right-column">
-
           <section class="ai-panel">
-
             <!-- AI HEADER -->
             <div class="ai-header">
-
               <div>
                 <h2>AI Code Analysis</h2>
 
-                <p>
-                  Intelligent analysis of your coding performance
-                </p>
+                <p>Intelligent analysis of your coding performance</p>
               </div>
 
-              <span class="ai-badge">
-                AI
-              </span>
-
+              <span class="ai-badge"> AI </span>
             </div>
-
 
             <!-- AI CONTENT -->
             <div class="ai-empty">
+              <div class="ai-icon">✦</div>
 
-              <div class="ai-icon">
-                ✦
-              </div>
-
-              <h3>
-                AI analysis will appear here
-              </h3>
+              <h3>AI analysis will appear here</h3>
 
               <p>
-                Select a solved problem to view AI-generated
-                insights about your code, complexity, quality
-                and improvements.
+                Select a solved problem to view AI-generated insights about your
+                code, complexity, quality and improvements.
               </p>
-
             </div>
-
           </section>
-
         </div>
-
       </main>
-
     </div>
-
 
     <!-- YOUR JAVASCRIPT -->
     <script src="config.js"></script>
     <script src="app.js"></script>
-
   </body>
 </html>

@@ -29,6 +29,8 @@
   var codeTimeEl = document.getElementById("codeTime");
   var codeViewEl = document.getElementById("codeView");
   var problemStatsEl = document.getElementById("problemStats");
+  var skillScoreEl = document.getElementById("skillScore");
+  var streakValEl = document.getElementById("streakVal");
 
   function send(message) {
     return new Promise(function (resolve, reject) {
@@ -169,6 +171,23 @@
     );
   }
 
+  async function loadSkillScore() {
+    try {
+      var result = await send({ action: "apiRequest", path: "/dashboard/full" });
+      if (result && result.ok && result.data) {
+        var d = result.data;
+        skillScoreEl.textContent = d.overall && d.overall.overall_skill_score != null
+          ? d.overall.overall_skill_score
+          : "—";
+        streakValEl.textContent = d.overall && d.overall.streak_days != null
+          ? d.overall.streak_days
+          : "0";
+      }
+    } catch (e) {
+      // Skill score not critical - silently fail
+    }
+  }
+
   async function checkAuth() {
     var data = await new Promise(function (resolve) {
       chrome.storage.local.get(["authToken", "user"], resolve);
@@ -183,8 +202,10 @@
       if (!result.ok) throw new Error(result.reason || "Session expired");
       authPanel.classList.add("hidden");
       appPanel.classList.remove("hidden");
-      userName.textContent =
-    result.data.name[0].toUpperCase() + result.data.name.slice(1);
+      var displayName = result.data.name || result.data.email || "User";
+      userName.textContent = displayName[0].toUpperCase() + displayName.slice(1);
+      // Load skill score from backend
+      loadSkillScore();
     } catch (e) {
       await send({ action: "clearAuth" });
       authPanel.classList.remove("hidden");
@@ -223,11 +244,7 @@
         path: mode === "signup" ? "/auth/register" : "/auth/login",
         options: {
           method: "POST",
-          body: JSON.stringify({
-            email: email,
-            password: password,
-            name: name,
-          }),
+          body: JSON.stringify({ email: email, password: password, name: name }),
         },
       });
       if (!result.ok) throw new Error(result.reason || "Authentication failed");
@@ -245,55 +262,47 @@
     }
   }
 
-  loginTab.addEventListener("click", function () {
-    setMode("login");
-  });
-  signupTab.addEventListener("click", function () {
-    setMode("signup");
-  });
+  loginTab.addEventListener("click", function () { setMode("login"); });
+  signupTab.addEventListener("click", function () { setMode("signup"); });
   authBtn.addEventListener("click", authenticate);
   passwordInput.addEventListener("keydown", function (e) {
     if (e.key === "Enter") authenticate();
   });
 
-  document
-    .getElementById("logoutBtn")
-    .addEventListener("click", async function () {
-      await send({ action: "clearAuth" });
-      checkAuth();
-    });
-  document
-    .getElementById("dashboardBtn")
-    .addEventListener("click", async function () {
-      syncStatus.textContent = "Opening dashboard...";
-      var result = await send({ action: "openDashboard" });
-      syncStatus.textContent = result.ok
-        ? "Dashboard opened."
-        : "Dashboard: " + (result.reason || "login required");
-    });
+  document.getElementById("logoutBtn").addEventListener("click", async function () {
+    await send({ action: "clearAuth" });
+    checkAuth();
+  });
+
+  document.getElementById("dashboardBtn").addEventListener("click", async function () {
+    syncStatus.textContent = "Opening dashboard...";
+    var result = await send({ action: "openDashboard" });
+    syncStatus.textContent = result.ok
+      ? "Dashboard opened."
+      : "Dashboard: " + (result.reason || "login required");
+  });
+
   document.getElementById("resetBtn").addEventListener("click", function () {
-    if (
-      !confirm("Clear local attempt history? Server data will not be deleted.")
-    )
-      return;
+    if (!confirm("Clear local attempt history? Server data will not be deleted.")) return;
     chrome.storage.local.set(
       { stats: { correct: 0, wrong: 0 }, history: [], problemStats: {} },
       loadLocal,
     );
   });
+
   document.getElementById("copyBtn").addEventListener("click", function () {
     var entry = state.history[state.selectedIndex];
     if (!entry) return;
+    var copyBtn = document.getElementById("copyBtn");
     navigator.clipboard.writeText(entry.code || "").then(function () {
-      var old = document.getElementById("copyBtn").textContent;
-      document.getElementById("copyBtn").textContent = "Copied";
-      setTimeout(function () {
-        document.getElementById("copyBtn").textContent = old;
-      }, 1000);
+      var old = copyBtn.textContent;
+      copyBtn.textContent = "Copied";
+      setTimeout(function () { copyBtn.textContent = old; }, 1000);
     });
   });
+
   chrome.storage.onChanged.addListener(function (changes, area) {
-    if (area === "local" && (changes.stats || changes.history)) loadLocal();
+    if (area === "local" && (changes.stats || changes.history || changes.problemStats)) loadLocal();
   });
 
   loadLocal();

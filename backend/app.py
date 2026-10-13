@@ -1164,7 +1164,11 @@ def create_dashboard_code():
     )
     db.session.commit()
 
-    return jsonify({"url": f"{dashboard_url}/extension-login.html?code={raw}"})
+    
+    return jsonify({
+    "url": f"{dashboard_origin}/dashboard/extension-login.html?code={raw}"
+        })
+
 
 
 @app.post("/api/auth/exchange-dashboard-code")

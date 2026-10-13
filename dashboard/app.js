@@ -264,20 +264,29 @@
     $('report-meta').textContent = 'Last updated: ' + generatedAt;
   }
 
-  $('regen-btn').addEventListener('click', async () => {
-    $('regen-btn').disabled = true;
-    $('regen-btn').textContent = 'Generating...';
+ const regenBtn = $('regen-btn');
+
+if (regenBtn) {
+  regenBtn.addEventListener('click', async () => {
+    regenBtn.disabled = true;
+    regenBtn.textContent = 'Generating...';
+
     try {
       await api('/report/regenerate', { method: 'POST' });
-      $('report-content').innerHTML = '<div class="loading-msg">⏳ AI is generating your report... please wait 30 seconds then refresh.</div>';
+
+      $('report-content').innerHTML =
+        '<div class="loading-msg">⏳ AI is generating your report... please wait 30 seconds then refresh.</div>';
+
       tabLoaded['report'] = false;
     } catch (e) {
-      $('report-content').innerHTML = '<div class="error-msg">' + esc(e.message) + '</div>';
+      $('report-content').innerHTML =
+        '<div class="error-msg">' + esc(e.message) + '</div>';
     } finally {
-      $('regen-btn').disabled = false;
-      $('regen-btn').textContent = 'Regenerate';
+      regenBtn.disabled = false;
+      regenBtn.textContent = 'Regenerate';
     }
   });
+}
 
   // ── Problems tab ──────────────────────────────────────────
   function loadProblems() {

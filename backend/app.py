@@ -1166,7 +1166,7 @@ def create_dashboard_code():
 
     
     return jsonify({
-    "url": f"{dashboard_origin}/dashboard/extension-login.html?code={raw}"
+    "url": f"{dashboard_url}/extension-login.html?code={raw}"
         })
 
 

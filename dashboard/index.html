@@ -3,135 +3,202 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
     <title>LearnSense AI Dashboard</title>
     <link rel="icon" type="image/png" href="icons/icon48.png" />
-
     <link rel="stylesheet" href="style.css" />
   </head>
-
   <body>
-    <div class="app">
+    <div class="app" id="app">
       <!-- HEADER -->
       <header>
-        <div>
+        <div class="brand-wrap">
           <div class="brand">LearnSense <span>AI</span></div>
-
-          <p>Learning analytics for your LeetCode practice</p>
+          <p>Your personal DSA learning analytics</p>
         </div>
-
-        <button id="logout" class="ghost">Logout</button>
+        <div class="header-right">
+          <span id="user" class="user-email">Loading...</span>
+          <button id="logout" class="ghost">Logout</button>
+        </div>
       </header>
 
-      <!-- MAIN TWO COLUMN DASHBOARD -->
-      <main class="dashboard-grid">
-        <!-- ================= LEFT COLUMN ================= -->
+      <!-- NAV TABS -->
+      <nav class="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="skills">Skills</button>
+        <button class="tab" data-tab="report">AI Report</button>
+        <button class="tab" data-tab="problems">Problems</button>
+        <button class="tab" data-tab="goals">Goals</button>
+      </nav>
 
-        <div class="left-column">
-          <!-- LEARNING REPORT -->
-          <section class="hero">
+      <!-- MAIN CONTENT -->
+      <main>
+        <!-- ===== OVERVIEW TAB ===== -->
+        <section id="tab-overview" class="tab-content active">
+          <div class="overview-grid">
+            <div class="left-col">
+              <!-- Hero score card -->
+              <div class="hero-card">
+                <div class="hero-left">
+                  <div class="skill-score-ring">
+                    <div class="score-num" id="hero-score">—</div>
+                    <div class="score-label">DSA Skill Score</div>
+                  </div>
+                </div>
+                <div class="hero-right">
+                  <div class="hero-stat">
+                    <div class="hs-val" id="streak-val">0</div>
+                    <div class="hs-lbl">Day streak 🔥</div>
+                  </div>
+                  <div class="hero-stat">
+                    <div class="hs-val" id="solved-val">0</div>
+                    <div class="hs-lbl">Problems solved</div>
+                  </div>
+                  <div class="hero-stat">
+                    <div class="hs-val" id="accuracy-val">0%</div>
+                    <div class="hs-lbl">Accuracy</div>
+                  </div>
+                  <button id="refresh" class="primary sm">Refresh</button>
+                </div>
+              </div>
+
+              <!-- Stat cards -->
+              <div class="stat-cards">
+                <div class="scard">
+                  <span>Solved</span>
+                  <strong id="stat-solved">0</strong>
+                </div>
+                <div class="scard">
+                  <span>Correct attempts</span>
+                  <strong class="good" id="stat-correct">0</strong>
+                </div>
+                <div class="scard">
+                  <span>Wrong attempts</span>
+                  <strong class="bad" id="stat-wrong">0</strong>
+                </div>
+                <div class="scard">
+                  <span>Accuracy</span>
+                  <strong id="stat-accuracy">0%</strong>
+                </div>
+              </div>
+
+              <!-- Problems table -->
+              <div class="panel">
+                <div class="panel-head">
+                  <h2>Problem performance</h2>
+                  <span id="overview-status" class="muted"></span>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Problem</th><th>Correct</th><th>Wrong</th>
+                        <th>Total</th><th>Accuracy</th><th>Last solved</th>
+                      </tr>
+                    </thead>
+                    <tbody id="overview-problems"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right panel: selected problem code -->
+            <div class="right-col" id="code-panel">
+              <div class="panel code-outer">
+                <div class="panel-head">
+                  <h2>Solution</h2>
+                  <span id="solution-meta" class="muted">Select a problem</span>
+                </div>
+                <pre id="code-view">Click a problem to view its accepted solution.</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== SKILLS TAB ===== -->
+        <section id="tab-skills" class="tab-content">
+          <div class="skills-header">
             <div>
-              <h1>Your learning report</h1>
-              <p id="user">Loading account...</p>
+              <h2>DSA Skill Map</h2>
+              <p class="muted">Topic-wise skill scores based on your submissions</p>
             </div>
-
-            <button id="refresh" class="primary">Refresh</button>
-          </section>
-
-          <!-- STATISTICS -->
-          <section class="cards">
-            <div class="card">
-              <span>Solved problems</span>
-              <strong id="solved">0</strong>
+            <div class="overall-pill">
+              <span>Overall</span>
+              <strong id="skills-overall">—</strong>
             </div>
+          </div>
+          <div class="topic-grid" id="topic-grid">
+            <div class="loading-msg">Loading skill scores...</div>
+          </div>
+        </section>
 
-            <div class="card">
-              <span>Successful attempts</span>
-              <strong id="correct">0</strong>
+        <!-- ===== AI REPORT TAB ===== -->
+        <section id="tab-report" class="tab-content">
+          <div class="report-header">
+            <div>
+              <h2>AI Learning Report</h2>
+              <p class="muted" id="report-meta">Personalized analysis from your practice data</p>
             </div>
+            <button id="regen-btn" class="primary">Regenerate</button>
+          </div>
+          <div id="report-content">
+            <div class="loading-msg" id="report-loading">Loading report...</div>
+          </div>
+        </section>
 
-            <div class="card">
-              <span>Wrong attempts</span>
-              <strong id="wrong">0</strong>
-            </div>
-
-            <div class="card">
-              <span>Accuracy</span>
-              <strong id="accuracy">0%</strong>
-            </div>
-          </section>
-
-          <!-- PROBLEM PERFORMANCE -->
-          <section class="panel">
+        <!-- ===== PROBLEMS TAB ===== -->
+        <section id="tab-problems" class="tab-content">
+          <div class="panel">
             <div class="panel-head">
-              <h2>Problem performance</h2>
-
-              <span id="status"></span>
+              <h2>All Problems</h2>
+              <input type="search" id="problem-search" class="search-input" placeholder="Filter problems..." />
             </div>
-
-            <div class="table-wrap">
+            <div class="table-wrap full-table">
               <table>
                 <thead>
                   <tr>
-                    <th>Problem</th>
-                    <th>Correct</th>
-                    <th>Wrong</th>
-                    <th>Total</th>
-                    <th>Accuracy</th>
-                    <th>Last solved</th>
+                    <th>Problem</th><th>Correct</th><th>Wrong</th>
+                    <th>Total</th><th>Accuracy</th><th>Last solved</th>
                   </tr>
                 </thead>
-
-                <tbody id="problems"></tbody>
+                <tbody id="all-problems"></tbody>
               </table>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <!-- ACCEPTED SOLUTION -->
-           
-          <section class="panel" id="acceptedSolution">
-            <div class="panel-head">
-              <h2>Accepted solution</h2>
-
-              <span id="solutionMeta"></span>
-            </div>
-
-            <pre id="code">Select a problem above.</pre>
-          </section>
-        </div>
-
-        <!-- ================= RIGHT COLUMN ================= -->
-
-        <div class="right-column">
-          <section class="ai-panel">
-            <!-- AI HEADER -->
-            <div class="ai-header">
-              <div>
-                <h2>AI Code Analysis</h2>
-
-                <p>Intelligent analysis of your coding performance</p>
+        <!-- ===== GOALS TAB ===== -->
+        <section id="tab-goals" class="tab-content">
+          <div class="panel goals-panel">
+            <div class="panel-head"><h2>Learning Goals</h2></div>
+            <div class="goals-body">
+              <div class="goal-field">
+                <label>Goal type</label>
+                <select id="goal-type">
+                  <option value="general">General DSA Practice</option>
+                  <option value="placement">Campus Placement / FAANG</option>
+                  <option value="exam">College / Competitive Exam</option>
+                </select>
               </div>
-
-              <span class="ai-badge"> AI </span>
+              <div class="goal-field">
+                <label>Daily target (minutes)</label>
+                <input type="number" id="goal-daily" min="0" max="480" placeholder="e.g. 60" />
+              </div>
+              <div class="goal-field">
+                <label>Target date (optional)</label>
+                <input type="date" id="goal-date" />
+              </div>
+              <div class="goal-field">
+                <label>Notes</label>
+                <textarea id="goal-notes" rows="3" placeholder="Any additional context..."></textarea>
+              </div>
+              <button id="save-goal" class="primary">Save Goal</button>
+              <div id="goal-msg" class="muted"></div>
             </div>
-
-            <!-- AI CONTENT -->
-            <div class="ai-empty">
-              <div class="ai-icon">✦</div>
-
-              <h3>AI analysis will appear here</h3>
-
-              <p>
-                Select a solved problem to view AI-generated insights about your
-                code, complexity, quality and improvements.
-              </p>
-            </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </main>
     </div>
 
-    <!-- YOUR JAVASCRIPT -->
     <script src="config.js"></script>
     <script src="app.js"></script>
   </body>

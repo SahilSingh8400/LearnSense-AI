@@ -19,30 +19,15 @@
       <button id="dashboardBtn" class="primary-btn">View Dashboard</button>
       <button id="resetBtn" class="text-btn">Reset local</button>
     </div>
+
     <section id="authPanel" class="auth-panel">
       <div class="auth-tabs">
         <button id="loginTab" class="tab active">Login</button>
         <button id="signupTab" class="tab">Sign up</button>
       </div>
-      <input
-        id="nameInput"
-        class="hidden"
-        type="text"
-        placeholder="Name"
-        autocomplete="name"
-      />
-      <input
-        id="emailInput"
-        type="email"
-        placeholder="Email"
-        autocomplete="email"
-      />
-      <input
-        id="passwordInput"
-        type="password"
-        placeholder="Password (8+ characters)"
-        autocomplete="current-password"
-      />
+      <input id="nameInput" class="hidden" type="text" placeholder="Name" autocomplete="name" />
+      <input id="emailInput" type="email" placeholder="Email" autocomplete="email" />
+      <input id="passwordInput" type="password" placeholder="Password (8+ characters)" autocomplete="current-password" />
       <button id="authBtn" class="primary-btn">Login</button>
       <div id="authMessage" class="message"></div>
     </section>
@@ -54,6 +39,18 @@
           ><strong id="userName">—</strong>
         </div>
         <button id="logoutBtn" class="text-btn">Logout</button>
+      </section>
+
+      <!-- Skill score badge -->
+      <section class="skill-row" id="skillRow">
+        <div class="skill-badge">
+          <span class="skill-val" id="skillScore">—</span>
+          <span class="skill-lbl">DSA Score</span>
+        </div>
+        <div class="skill-badge">
+          <span class="skill-val" id="streakVal">0</span>
+          <span class="skill-lbl">Day Streak 🔥</span>
+        </div>
       </section>
 
       <section class="stats" aria-label="Local attempt statistics">
@@ -90,9 +87,7 @@
             </div>
           </div>
           <div class="code-view" id="codeView">
-            <p class="empty-note">
-              Solve a problem on LeetCode and hit Submit.
-            </p>
+            <p class="empty-note">Solve a problem on LeetCode and hit Submit.</p>
           </div>
         </div>
       </section>

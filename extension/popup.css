@@ -585,3 +585,29 @@ body {
 
   color: #94a3b8;
 }
+
+/* Skill score row */
+.skill-row {
+  display: flex;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #0e1527;
+  border-bottom: 1px solid #1a2440;
+}
+.skill-badge {
+  flex: 1;
+  text-align: center;
+  padding: 8px 4px;
+}
+.skill-val {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  color: #7c6cff;
+}
+.skill-lbl {
+  display: block;
+  font-size: 10px;
+  color: #6b7a96;
+  margin-top: 2px;
+}

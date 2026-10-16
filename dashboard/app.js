@@ -110,7 +110,27 @@
       const me = await api("/me");
       if ($("user")) $("user").textContent = me.email;
 
-      const data = await api("/dashboard/full");
+      let data;
+      let usedFull = false;
+      try {
+        data = await api("/dashboard/full");
+        usedFull = true;
+      } catch (fullErr) {
+        // Fallback to /dashboard/summary if /dashboard/full fails
+        // (e.g. missing tables before migration)
+        console.warn("dashboard/full failed, falling back to summary:", fullErr.message);
+        const summaryData = await api("/dashboard/summary");
+        data = {
+          overall: {
+            ...summaryData.overall,
+            overall_skill_score: null,
+            streak_days: 0,
+          },
+          problems: summaryData.problems,
+          topics: [],
+          report_status: "none",
+        };
+      }
       cachedFullData = data;
 
       // Hero card

@@ -148,7 +148,7 @@
 
       // Stat cards
       if ($("stat-solved"))
-        $("stat-solved").textContent = data.overall.solved_problems || 0;
+        $("stat-solved").textContent = data.overall.correct + data.overall.wrong || 0;
       if ($("stat-correct"))
         $("stat-correct").textContent = data.overall.correct || 0;
       if ($("stat-wrong"))

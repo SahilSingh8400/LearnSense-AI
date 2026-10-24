@@ -83,7 +83,7 @@
       .sort(function (a, b) {
         return b.attempts - a.attempts;
       })
-      .slice(0, 5);
+      .slice(0, 3);
     problemStatsEl.innerHTML = rows.length
       ? ""
       : '<div class="problem-empty">No question statistics yet.</div>';

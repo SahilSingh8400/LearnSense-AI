@@ -49,8 +49,21 @@
       .replace(/>/g, "&gt;");
   }
 
+  // Accept millisecond timestamps, second timestamps, or ISO date strings.
+  function normalizeTimestamp(value) {
+    if (value == null || value === "") return 0;
+    var numericValue = typeof value === "number" || /^\d+(?:\.\d+)?$/.test(String(value).trim());
+    var n = numericValue ? Number(value) : Date.parse(value);
+    if (!Number.isFinite(n)) n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    // Unix timestamps in seconds are currently about 10 digits; milliseconds 13.
+    return n < 100000000000 ? n * 1000 : n;
+  }
+
   function formatTime(ts) {
-    return new Date(ts).toLocaleString(undefined, {
+    var normalized = normalizeTimestamp(ts);
+    if (!normalized) return "Time unavailable";
+    return new Date(normalized).toLocaleString(undefined, {
       month: "short",
       day: "numeric",
       hour: "numeric",
@@ -58,9 +71,13 @@
     });
   }
 
+  function normalizedTitle(value) {
+    return String(value || "Untitled").trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
   function renderStats() {
-    var correct = state.stats.correct || 0,
-      wrong = state.stats.wrong || 0,
+    var correct = Number(state.stats.correct) || 0,
+      wrong = Number(state.stats.wrong) || 0,
       total = correct + wrong;
     correctCountEl.textContent = correct;
     wrongCountEl.textContent = wrong;
@@ -69,19 +86,35 @@
   }
 
   function renderProblemStats() {
+    // Use history timestamps to infer recency for older problemStats records that
+    // do not yet contain lastAttemptAt. Counts still come from problemStats.
+    var latestByTitle = {};
+    state.history.forEach(function (entry) {
+      var titleKey = normalizedTitle(entry.title);
+      var ts = normalizeTimestamp(entry.timestamp);
+      if (ts > (latestByTitle[titleKey] || 0)) latestByTitle[titleKey] = ts;
+    });
+
     var rows = Object.keys(state.problemStats || {})
       .map(function (key) {
-        var p = state.problemStats[key];
-        var total = (p.correct || 0) + (p.wrong || 0);
+        var p = state.problemStats[key] || {};
+        var correct = Number(p.correct) || 0;
+        var wrong = Number(p.wrong) || 0;
+        var title = p.title || "Untitled";
+        var recordedTime = normalizeTimestamp(p.lastAttemptAt || p.lastAttempt || p.updatedAt);
+        var historyTime = latestByTitle[normalizedTitle(title)] || 0;
         return {
-          title: p.title || "Untitled",
-          correct: p.correct || 0,
-          wrong: p.wrong || 0,
-          attempts: total,
+          title: title,
+          correct: correct,
+          wrong: wrong,
+          attempts: correct + wrong,
+          lastAttemptAt: Math.max(recordedTime, historyTime),
         };
       })
+      // Most recently attempted questions first; use attempt count only as a
+      // tie-breaker when timestamps are unavailable/equal.
       .sort(function (a, b) {
-        return b.attempts - a.attempts;
+        return (b.lastAttemptAt - a.lastAttemptAt) || (b.attempts - a.attempts);
       })
       .slice(0, 3);
     problemStatsEl.innerHTML = rows.length
@@ -142,9 +175,10 @@
       return;
     }
     codeTitleEl.textContent = entry.title || "Untitled";
-    codeVerdictEl.textContent = entry.verdict;
+    var verdict = entry.verdict || "Unknown";
+    codeVerdictEl.textContent = verdict;
     codeVerdictEl.className =
-      "verdict " + (entry.verdict === "Accepted" ? "ok" : "bad");
+      "verdict " + (verdict === "Accepted" ? "ok" : "bad");
     codeTimeEl.textContent = formatTime(entry.timestamp);
     codeViewEl.innerHTML = (entry.code || "(no code captured)")
       .split("\n")
@@ -158,16 +192,26 @@
     chrome.storage.local.get(
       ["stats", "history", "problemStats"],
       function (data) {
+        if (chrome.runtime.lastError) {
+          console.error("Unable to load local dashboard data:", chrome.runtime.lastError.message);
+          return;
+        }
         state.stats = data.stats || { correct: 0, wrong: 0 };
-        state.history = data.history || [];
-        state.problemStats = data.problemStats || {};
-        if (state.selectedIndex >= state.history.length)
+        state.history = (Array.isArray(data.history) ? data.history : [])
+          .slice()
+          .sort(function (a, b) {
+            return normalizeTimestamp(b && b.timestamp) - normalizeTimestamp(a && a.timestamp);
+          });
+        state.problemStats = data.problemStats && typeof data.problemStats === "object"
+          ? data.problemStats
+          : {};
+        if (state.selectedIndex < 0 || state.selectedIndex >= state.history.length)
           state.selectedIndex = 0;
         renderStats();
         renderProblemStats();
         renderHistory();
         renderCode();
-      },
+      }
     );
   }
 
@@ -199,7 +243,7 @@
     }
     try {
       var result = await send({ action: "apiRequest", path: "/me" });
-      if (!result.ok) throw new Error(result.reason || "Session expired");
+      if (!result || !result.ok || !result.data) throw new Error((result && result.reason) || "Session expired");
       authPanel.classList.add("hidden");
       appPanel.classList.remove("hidden");
       var displayName = result.data.name || result.data.email || "User";
@@ -247,7 +291,9 @@
           body: JSON.stringify({ email: email, password: password, name: name }),
         },
       });
-      if (!result.ok) throw new Error(result.reason || "Authentication failed");
+      if (!result || !result.ok || !result.data || !result.data.access_token) {
+        throw new Error((result && result.reason) || "Authentication failed: invalid server response.");
+      }
       await send({
         action: "saveAuth",
         token: result.data.access_token,
@@ -276,10 +322,14 @@
 
   document.getElementById("dashboardBtn").addEventListener("click", async function () {
     syncStatus.textContent = "Opening dashboard...";
-    var result = await send({ action: "openDashboard" });
-    syncStatus.textContent = result.ok
-      ? "Dashboard opened."
-      : "Dashboard: " + (result.reason || "login required");
+    try {
+      var result = await send({ action: "openDashboard" });
+      syncStatus.textContent = result && result.ok
+        ? "Dashboard opened."
+        : "Dashboard: " + ((result && result.reason) || "login required");
+    } catch (e) {
+      syncStatus.textContent = "Dashboard: " + (e.message || "Unable to open dashboard");
+    }
   });
 
   document.getElementById("resetBtn").addEventListener("click", function () {
@@ -294,10 +344,16 @@
     var entry = state.history[state.selectedIndex];
     if (!entry) return;
     var copyBtn = document.getElementById("copyBtn");
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      copyBtn.textContent = "Clipboard unavailable";
+      return;
+    }
     navigator.clipboard.writeText(entry.code || "").then(function () {
       var old = copyBtn.textContent;
       copyBtn.textContent = "Copied";
       setTimeout(function () { copyBtn.textContent = old; }, 1000);
+    }).catch(function () {
+      copyBtn.textContent = "Copy failed";
     });
   });
 

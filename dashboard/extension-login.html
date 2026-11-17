@@ -3,20 +3,134 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Signing you in…</title>
-    <link rel="stylesheet" href="styles.css" />
+    <title>LearnSense AI – Sign In</title>
+    <link rel="icon" type="image/png" href="icons/icon48.png" />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      .login-box {
+        max-width: 380px;
+        margin: 60px auto;
+        padding: 32px;
+        background: #0e1527;
+        border: 1px solid #202b45;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      }
+      .login-box h2 {
+        margin: 12px 0 6px;
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .login-box p {
+        color: #7f8ba5;
+        font-size: 13px;
+        margin-bottom: 24px;
+      }
+      .input-group {
+        margin-bottom: 16px;
+        text-align: left;
+      }
+      .input-group label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #7f8ba5;
+        margin-bottom: 6px;
+      }
+      .input-group input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 14px;
+        background: #151d31;
+        border: 1px solid #253352;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 14px;
+      }
+      .input-group input:focus {
+        outline: none;
+        border-color: #7c6cff;
+      }
+      .btn-block {
+        width: 100%;
+        padding: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        border-radius: 8px;
+        margin-top: 8px;
+        cursor: pointer;
+      }
+      .login-toggle {
+        margin-top: 18px;
+        font-size: 12px;
+        color: #7f8ba5;
+        text-align: center;
+      }
+      .login-toggle a {
+        color: #7c6cff;
+        text-decoration: none;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .login-msg {
+        margin-top: 14px;
+        font-size: 13px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        display: none;
+      }
+      .login-msg.err {
+        display: block;
+        background: rgba(255, 77, 77, 0.15);
+        color: #ff6b6b;
+        border: 1px solid rgba(255, 77, 77, 0.3);
+      }
+      .login-msg.ok {
+        display: block;
+        background: rgba(88, 214, 141, 0.15);
+        color: #58d68d;
+        border: 1px solid rgba(88, 214, 141, 0.3);
+      }
+    </style>
   </head>
   <body>
-    <div class="center">
+    <div class="login-box">
       <div class="brand">LearnSense <span>AI</span></div>
-      <h2>Signing you in…</h2>
-      <p id="message">Securely connecting your extension to the dashboard.</p>
+      <h2 id="login-title">Sign In to Dashboard</h2>
+      <p id="login-sub">Access your offline DSA performance analytics</p>
+
+      <div id="ext-status" style="display:none; margin-bottom: 16px;">
+        <p id="message" style="color: #7c6cff;">Connecting to extension...</p>
+      </div>
+
+      <form id="auth-form" onsubmit="return false;">
+        <div class="input-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="e.g. student@example.com" required value="sahil98099@gmail.com" />
+        </div>
+        <div class="input-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Enter your password" required />
+        </div>
+        <button id="btn-submit" type="submit" class="primary btn-block">Sign In</button>
+        <button id="btn-register" type="button" class="ghost btn-block" style="margin-top:8px;">Create New Account</button>
+      </form>
+
+      <div id="status-msg" class="login-msg"></div>
     </div>
+
     <script src="config.js"></script>
     <script src="app.js"></script>
     <script>
       window.addEventListener("load", function () {
-        if (window.handleExtensionLogin) window.handleExtensionLogin();
+        const params = new URLSearchParams(location.search);
+        if (params.get("code") && window.handleExtensionLogin) {
+          document.getElementById("ext-status").style.display = "block";
+          document.getElementById("auth-form").style.display = "none";
+          window.handleExtensionLogin();
+        }
       });
     </script>
   </body>

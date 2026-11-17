@@ -39,9 +39,9 @@
               <!-- Hero score card -->
               <div class="hero-card">
                 <div class="hero-left">
-                  <div class="skill-score-ring">
+                  <div class="skill-score-ring" id="hero-ring">
                     <div class="score-num" id="hero-score">—</div>
-                    <div class="score-label">DSA Skill Score</div>
+                    <div class="score-label" id="hero-tier">DSA Skill Score</div>
                   </div>
                 </div>
                 <div class="hero-right">
@@ -92,7 +92,7 @@
                     <thead>
                       <tr>
                         <th>Problem</th><th>Correct</th><th>Wrong</th>
-                        <th>Total</th><th>Accuracy</th><th>Last solved</th>
+                        <th>Total</th><th>Accuracy</th><th>Complexity</th><th>Last solved</th>
                       </tr>
                     </thead>
                     <tbody id="overview-problems"></tbody>
@@ -101,14 +101,76 @@
               </div>
             </div>
 
-            <!-- Right panel: selected problem code -->
+            <!-- Right panel: selected problem code & AI analysis -->
             <div class="right-col" id="code-panel">
               <div class="panel code-outer">
                 <div class="panel-head">
-                  <h2>Solution</h2>
-                  <span id="solution-meta" class="muted">Select a problem</span>
+                  <div>
+                    <h2>Solution & AI Analysis</h2>
+                    <span id="solution-meta" class="muted">Select a problem</span>
+                  </div>
+                  <button id="ai-reanalyze-btn" class="ghost sm" style="display:none;" title="Re-evaluate with AI">⚡ AI Analyze</button>
                 </div>
-                <pre id="code-view">Click a problem to view its accepted solution.</pre>
+                
+                <!-- AI Complexity & Optimal Card -->
+                <div id="ai-complexity-card" class="ai-complexity-card" style="display:none;">
+                  <div class="optimality-banner" id="optimality-banner">
+                    <span class="status-icon" id="opt-icon">✅</span>
+                    <div class="status-text">
+                      <strong id="opt-title">Optimal Solution</strong>
+                      <p id="opt-subtitle">Your approach achieves the optimal theoretical complexity bounds.</p>
+                    </div>
+                  </div>
+
+                  <div class="complexity-comparison-grid">
+                    <div class="comp-box your-comp">
+                      <span class="comp-label">Your Solution</span>
+                      <div class="comp-metric">
+                        <span class="comp-type">Time:</span>
+                        <strong id="your-time-comp">—</strong>
+                      </div>
+                      <div class="comp-metric">
+                        <span class="comp-type">Space:</span>
+                        <strong id="your-space-comp">—</strong>
+                      </div>
+                    </div>
+                    <div class="comp-box expected-comp">
+                      <span class="comp-label">Expected (Optimal)</span>
+                      <div class="comp-metric">
+                        <span class="comp-type">Time:</span>
+                        <strong id="exp-time-comp">—</strong>
+                      </div>
+                      <div class="comp-metric">
+                        <span class="comp-type">Space:</span>
+                        <strong id="exp-space-comp">—</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- AI Thought Section -->
+                  <div class="ai-thought-section">
+                    <div class="thought-header">
+                      <span class="thought-badge">🤖 AI Thought & Analysis</span>
+                      <span class="thought-tag" id="pattern-tag">Optimal</span>
+                    </div>
+                    <div class="thought-body" id="ai-thought-text">
+                      Analyzing algorithmic design...
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Solution Code Tabs -->
+                <div class="code-tabs-bar" id="code-tabs-bar" style="display:none;">
+                  <button class="code-tab active" id="tab-your-code">Your Solution</button>
+                  <button class="code-tab" id="tab-expected-code">Expected / Optimal Solution (AI)</button>
+                  <button class="code-tab copy-btn" id="copy-code-btn" title="Copy code">📋 Copy</button>
+                </div>
+
+                <!-- Code Views -->
+                <div class="code-container">
+                  <pre id="code-view">Click a problem to view its accepted solution and AI analysis.</pre>
+                  <pre id="expected-code-view" style="display:none;"></pre>
+                </div>
               </div>
             </div>
           </div>
@@ -119,11 +181,14 @@
           <div class="skills-header">
             <div>
               <h2>DSA Skill Map</h2>
-              <p class="muted">Topic-wise skill scores based on your submissions</p>
+              <p class="muted">Topic-wise skill scores evaluated by AI based on your practice data</p>
             </div>
-            <div class="overall-pill">
-              <span>Overall</span>
-              <strong id="skills-overall">—</strong>
+            <div style="display: flex; gap: 14px; align-items: center;">
+              <button id="skills-ai-btn" class="primary sm" style="padding: 10px 16px;">⚡ Analyze with AI</button>
+              <div class="overall-pill">
+                <span>Overall DSA Skill</span>
+                <strong id="skills-overall">—</strong>
+              </div>
             </div>
           </div>
           <div class="topic-grid" id="topic-grid">
@@ -157,7 +222,7 @@
                 <thead>
                   <tr>
                     <th>Problem</th><th>Correct</th><th>Wrong</th>
-                    <th>Total</th><th>Accuracy</th><th>Last solved</th>
+                    <th>Total</th><th>Accuracy</th><th>Complexity</th><th>Last solved</th>
                   </tr>
                 </thead>
                 <tbody id="all-problems"></tbody>

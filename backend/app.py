@@ -25,8 +25,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import defer, joinedload
 import ast
 import json
+import socket
 import threading
 import urllib.request
+
+socket.setdefaulttimeout(10)
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -34,6 +37,9 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 # Environment / logging
 
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(env_path):
+    load_dotenv(env_path)
 load_dotenv()
 
 logging.basicConfig(
@@ -52,13 +58,14 @@ def required_env(name: str) -> str:
 
 # FLASK_ENV was removed in Flask 2.3, so APP_ENV is the primary switch now.
 # FLASK_ENV is still honoured as a fallback for existing deployments.
-APP_ENV = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "production"))
+APP_ENV = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "development"))
 IS_PROD = APP_ENV == "production"
 
-# AI provider config (OpenRouter)
+# AI provider config (OpenRouter and Gemini direct)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemma-3-27b-it:free")
-AI_ENABLED = bool(OPENROUTER_API_KEY)
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "liquid/lfm-3-1.7b:free")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+AI_ENABLED = bool(OPENROUTER_API_KEY or GEMINI_API_KEY)
 
 
 # Flask app
@@ -74,7 +81,12 @@ app.config["MAX_CONTENT_LENGTH"] = int(
     os.getenv("MAX_CONTENT_LENGTH", str(2 * 1024 * 1024))
 )
 
-database_url = os.getenv("DATABASE_URL", "sqlite:///learnsense.db")
+instance_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "instance"))
+os.makedirs(instance_dir, exist_ok=True)
+db_file = os.path.join(instance_dir, "learnsense.db").replace("\\", "/")
+database_url = os.getenv("DATABASE_URL", f"sqlite:///{db_file}")
+if database_url in {"sqlite:///learnsense.db", "sqlite:///./learnsense.db"}:
+    database_url = f"sqlite:///{db_file}"
 # NOTE: "+psycopg" requires psycopg v3 (pip install "psycopg[binary]").
 # For psycopg2 use "postgresql+psycopg2://" instead.
 if database_url.startswith("postgres://"):
@@ -157,23 +169,34 @@ CORS(
     app,
     resources={
         r"/api/*": {
-            "origins": [dashboard_origin],
+            "origins": [dashboard_origin, "http://localhost:5000", "http://127.0.0.1:5000", "http://localhost:3000", "null"],
             "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
         }
     },
 )
+
+
+@app.before_request
+def handle_cors_preflight():
+    if request.method == "OPTIONS" and request.path.startswith("/api/"):
+        origin = request.headers.get("Origin", "*")
+        resp = app.make_default_options_response()
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        resp.headers["Access-Control-Allow-Credentials"] = "true"
+        return resp
 
 
 @app.after_request
 def handle_cors_for_extensions(response):
     origin = request.headers.get("Origin", "")
     match = EXTENSION_ORIGIN_RE.match(origin)
-    if request.path.startswith("/api/") and match:
-        ext_id = match.group(1)
-        if ext_id in EXTENSION_IDS or (not IS_PROD and not EXTENSION_IDS):
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    if request.path.startswith("/api/"):
+        if match or origin in {dashboard_origin, "http://localhost:5000", "http://127.0.0.1:5000", "http://localhost:3000"}:
+            response.headers["Access-Control-Allow-Origin"] = origin or "*"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
             response.headers["Access-Control-Allow-Methods"] = (
                 "GET, POST, PUT, PATCH, DELETE, OPTIONS"
             )
@@ -182,7 +205,7 @@ def handle_cors_for_extensions(response):
 
 
 # ============================================================
-# Dashboard static files
+# Dashboard static files (Offline First: / and /dashboard)
 # ============================================================
 
 DASHBOARD_DIR = os.path.abspath(
@@ -190,6 +213,7 @@ DASHBOARD_DIR = os.path.abspath(
 )
 
 
+@app.get("/")
 @app.get("/dashboard")
 @app.get("/dashboard/")
 def dashboard_home():
@@ -199,6 +223,16 @@ def dashboard_home():
 @app.get("/dashboard/<path:filename>")
 def dashboard_files(filename):
     return send_from_directory(DASHBOARD_DIR, filename)
+
+
+@app.get("/<path:filename>")
+def root_static_files(filename):
+    # Route only non-api static files
+    if not filename.startswith("api/"):
+        target = os.path.join(DASHBOARD_DIR, filename)
+        if os.path.isfile(target):
+            return send_from_directory(DASHBOARD_DIR, filename)
+    return send_from_directory(DASHBOARD_DIR, "index.html")
 
 
 # Security headers
@@ -367,6 +401,11 @@ class Evaluation(db.Model):
     # Detected info
     time_complexity = db.Column(db.String(50), nullable=True)
     space_complexity = db.Column(db.String(50), nullable=True)
+    expected_time_complexity = db.Column(db.String(50), nullable=True)
+    expected_space_complexity = db.Column(db.String(50), nullable=True)
+    is_optimal = db.Column(db.Boolean, nullable=True)
+    ai_thought = db.Column(db.Text, nullable=True)
+    expected_solution = db.Column(db.Text, nullable=True)
     detected_patterns = db.Column(db.Text, nullable=True)  # JSON list
     detected_topics = db.Column(db.Text, nullable=True)    # JSON list of topic slugs
     # Status: pending, done, failed
@@ -565,7 +604,7 @@ PATTERN_KEYWORDS = {
     "binary-search": ["binary_search", "bisect", "mid", "lo", "hi"],
     "bfs": ["bfs", "queue", "deque", "level_order"],
     "dfs": ["dfs", "stack", "recursive", "backtrack"],
-    "hash-map": ["hashmap", "dict", "counter", "defaultdict", "set"],
+    "hash-map": ["hashmap", "dict", "counter", "defaultdict", "set", "unordered_map", "unordered_set", "map<"],
     "heap": ["heap", "heapq", "priority_queue", "heappush", "heappop"],
     "greedy": ["greedy", "sort", "sorted"],
     "divide-conquer": ["merge_sort", "quick_sort", "divide"],
@@ -574,7 +613,7 @@ PATTERN_KEYWORDS = {
     "stack": ["stack", "monotonic"],
     "backtracking": ["backtrack", "permut", "combin", "subset"],
     "sorting": ["sort", "merge", "quick", "counting_sort", "radix"],
-    "bit-manipulation": ["xor", "&", "|", "<<", ">>", "bit"],
+    "bit-manipulation": ["xor", "bitset", "bitcount", "hamming"],
     "math": ["gcd", "lcm", "prime", "factorial", "sqrt", "math"],
     "string": ["str", "string", "substr", "palindrome", "anagram"],
     "linked-list": ["linked", "node", "next", "head", "tail", "ListNode"],
@@ -604,51 +643,179 @@ TOPIC_SLUG_MAP = {
     "interval": "intervals",
 }
 
+# Canonical problem to DSA topic mapping for common LeetCode problems
+PROBLEM_TOPIC_MAP = {
+    "two-sum": ["hash-maps", "two-pointers"],
+    "valid-anagram": ["hash-maps", "strings"],
+    "group-anagrams": ["hash-maps", "sorting"],
+    "contains-duplicate": ["hash-maps"],
+    "top-k-frequent-elements": ["heaps", "hash-maps"],
+    "product-of-array-except-self": ["arrays-and-hashing"],
+    "longest-consecutive-sequence": ["hash-maps"],
+    "valid-palindrome": ["two-pointers", "strings"],
+    "3sum": ["two-pointers", "sorting"],
+    "container-with-most-water": ["two-pointers"],
+    "best-time-to-buy-and-sell-stock": ["two-pointers", "sliding-window"],
+    "longest-substring-without-repeating-characters": ["sliding-window", "hash-maps"],
+    "longest-repeating-character-replacement": ["sliding-window"],
+    "minimum-window-substring": ["sliding-window", "hash-maps"],
+    "valid-parentheses": ["stacks-queues"],
+    "min-stack": ["stacks-queues"],
+    "evaluate-reverse-polish-notation": ["stacks-queues"],
+    "generate-parentheses": ["backtracking", "stacks-queues"],
+    "daily-temperatures": ["stacks-queues"],
+    "binary-search": ["binary-search"],
+    "search-a-2d-matrix": ["binary-search"],
+    "find-minimum-in-rotated-sorted-array": ["binary-search"],
+    "search-in-rotated-sorted-array": ["binary-search"],
+    "reverse-linked-list": ["linked-lists"],
+    "merge-two-sorted-lists": ["linked-lists"],
+    "reorder-list": ["linked-lists", "two-pointers"],
+    "remove-nth-node-from-end-of-list": ["linked-lists", "two-pointers"],
+    "linked-list-cycle": ["linked-lists", "two-pointers"],
+    "invert-binary-tree": ["trees"],
+    "maximum-depth-of-binary-tree": ["trees"],
+    "diameter-of-binary-tree": ["trees"],
+    "balanced-binary-tree": ["trees"],
+    "same-tree": ["trees"],
+    "subtree-of-another-tree": ["trees"],
+    "lowest-common-ancestor-of-a-binary-search-tree": ["trees"],
+    "binary-tree-level-order-traversal": ["trees", "graphs"],
+    "validate-binary-search-tree": ["trees"],
+    "kth-smallest-element-in-a-bst": ["trees"],
+    "construct-binary-tree-from-preorder-and-inorder-traversal": ["trees"],
+    "kth-largest-element-in-an-array": ["heaps"],
+    "find-median-from-data-stream": ["heaps"],
+    "combination-sum": ["backtracking"],
+    "subsets": ["backtracking"],
+    "subsets-ii": ["backtracking"],
+    "permutations": ["backtracking"],
+    "word-search": ["backtracking", "graphs"],
+    "number-of-islands": ["graphs"],
+    "clone-graph": ["graphs"],
+    "pacific-atlantic-water-flow": ["graphs"],
+    "course-schedule": ["graphs"],
+    "climbing-stairs": ["dynamic-programming"],
+    "min-cost-climbing-stairs": ["dynamic-programming"],
+    "coin-change": ["dynamic-programming"],
+    "longest-increasing-subsequence": ["dynamic-programming", "binary-search"],
+    "maximum-subarray": ["dynamic-programming", "greedy"],
+    "jump-game": ["greedy"],
+    "gas-station": ["greedy"],
+    "single-number": ["bit-manipulation"],
+    "number-of-1-bits": ["bit-manipulation"],
+    "counting-bits": ["bit-manipulation", "dynamic-programming"],
+    "reverse-bits": ["bit-manipulation"],
+    "missing-number": ["bit-manipulation", "arrays-and-hashing"],
+}
 
-def detect_patterns(code: str) -> list[str]:
-    """Heuristically detect DSA patterns from code text."""
+
+def detect_patterns(code: str, lang: str = "") -> list[str]:
+    """Heuristically detect DSA patterns from code text across languages."""
     if not code:
         return []
     code_lower = code.lower()
-    found = []
-    for pattern, keywords in PATTERN_KEYWORDS.items():
-        if any(kw in code_lower for kw in keywords):
-            found.append(pattern)
-    return found
+    found = set()
+
+    if any(k in code_lower for k in ["hashmap", "unordered_map", "dict(", "counter(", "defaultdict", "set(", "unordered_set", "map<", "hashset", "treemap", "treeset", ".has(", "new map"]):
+        found.add("hash-map")
+    if any(k in code_lower for k in ["left", "right", "low", "high", "two_pointer", "i++", "j--", "left++", "right--"]):
+        found.add("two-pointers")
+    if any(k in code_lower for k in ["sliding", "window", "max_len", "min_len", "window_size", "right - left"]):
+        found.add("sliding-window")
+    if any(k in code_lower for k in ["binary_search", "bisect", "mid", "lower_bound", "upper_bound", "lo + (hi - lo)"]):
+        found.add("binary-search")
+    if any(k in code_lower for k in ["bfs", "queue", "deque", "level_order", "poll()", "popleft()"]):
+        found.add("bfs")
+    if any(k in code_lower for k in ["dfs", "backtrack", "helper(", "solve(", "preorder", "inorder", "postorder"]) and ("tree" in code_lower or "visited" in code_lower or "root" in code_lower or "node" in code_lower):
+        found.add("dfs")
+    if any(k in code_lower for k in ["heap", "heapq", "priority_queue", "priorityqueue", "heappush", "heappop"]):
+        found.add("heap")
+    if any(k in code_lower for k in ["dp[", "memo", "lru_cache", "tabulation", "bottom_up", "vector<vector<int>>"]):
+        found.add("dynamic-programming")
+    if any(k in code_lower for k in ["stack<", "stack[", "monotonic", "stack.append", "stack.pop", "push(", "pop()"]) and "unordered_map" not in code_lower:
+        found.add("stack")
+    if any(k in code_lower for k in ["treenode", "root", "leaf", "inorder", "preorder", "postorder", "bst"]):
+        found.add("tree")
+    if any(k in code_lower for k in ["listnode", "linked", "head", "tail", "next"]):
+        found.add("linked-list")
+    if any(k in code_lower for k in ["xor", "bitset", "bit_count", "bitcount", "hamming"]) or ("^" in code_lower and "^=" in code_lower):
+        found.add("bit-manipulation")
+    if any(k in code_lower for k in ["greedy", "max_profit", "intervals.sort"]):
+        found.add("greedy")
+    if any(k in code_lower for k in ["backtrack", "permut", "combin", "subsets", "candidates"]):
+        found.add("backtracking")
+    if any(k in code_lower for k in [".sort()", "sort(", "sorted(", "arrays.sort", "collections.sort"]):
+        found.add("sorting")
+
+    return sorted(list(found))
 
 
-def estimate_complexity(code: str, lang: str) -> tuple[str, str]:
-    """Estimate time/space complexity using heuristic rules."""
+def detect_topics(problem_slug: str, code: str, lang: str = "") -> list[str]:
+    """Combine canonical problem topic mapping and code pattern detection."""
+    topics = set()
+    if problem_slug and problem_slug in PROBLEM_TOPIC_MAP:
+        topics.update(PROBLEM_TOPIC_MAP[problem_slug])
+    patterns = detect_patterns(code, lang)
+    for p in patterns:
+        slug = TOPIC_SLUG_MAP.get(p)
+        if slug:
+            topics.add(slug)
+    if not topics:
+        topics.add("arrays-and-hashing")
+    return sorted(list(topics))
+
+
+def estimate_complexity(code: str, lang: str = "") -> tuple[str, str]:
+    """Estimate time/space complexity using heuristic rules across languages."""
     if not code:
         return "unknown", "unknown"
     code_lower = code.lower()
-    lines = code.split("\n")
-    # Count nested loops as proxy for time complexity
-    loop_keywords = ["for ", "while "]
-    loop_count = sum(
-        1 for line in lines
-        if any(kw in line.lower() for kw in loop_keywords)
-    )
-    has_recursion = "def " in code and any(fn in code for fn in ["self(", "dfs(", "helper(", "solve(", "backtrack("])
-    has_nested = any(
-        lines[i].count("for ") + lines[i].count("while ") > 0 and
-        lines[j].count("for ") + lines[j].count("while ") > 0
-        for i in range(len(lines))
-        for j in range(i + 1, min(i + 6, len(lines)))
-    ) if len(lines) > 1 else False
+    lines = [l.strip() for l in code.split("\n") if l.strip()]
+
+    loop_count = 0
+    for line in lines:
+        if line.startswith("//") or line.startswith("#"):
+            continue
+        if any(line.startswith(kw) or f" {kw}" in line for kw in ["for ", "for(", "while ", "while("]):
+            loop_count += 1
+
+    has_recursion = any(fn in code_lower for fn in ["dfs(", "helper(", "solve(", "backtrack(", "traverse(", "quicksort(", "mergesort("])
+
+    has_nested = False
+    for i in range(len(lines)):
+        l1 = lines[i].lower()
+        if any(kw in l1 for kw in ["for ", "for(", "while ", "while("]):
+            for j in range(i + 1, min(i + 8, len(lines))):
+                l2 = lines[j].lower()
+                if any(kw in l2 for kw in ["for ", "for(", "while ", "while("]):
+                    has_nested = True
+                    break
+        if has_nested:
+            break
 
     # Time complexity
-    if has_nested or loop_count >= 2:
+    if any(kw in code_lower for kw in [
+        "binary_search", "bisect", "mid = (lo + hi)", "mid = lo + (hi - lo)",
+        "mid = (left + right)", "mid = left + (right - left)", "left <= right",
+        "left < right", "lo <= hi", "lo < hi", "start <= end"
+    ]) and not has_nested:
+        time_c = "O(log n)"
+    elif has_nested or (loop_count >= 2 and not any(k in code_lower for k in ["left++", "right--"])):
         time_c = "O(n²)" if not has_recursion else "O(2ⁿ)"
-    elif loop_count == 1:
-        time_c = "O(n)"
-    elif has_recursion:
+    elif any(kw in code_lower for kw in [".sort()", "sort(", "sorted(", "std::sort", "arrays.sort"]):
+        time_c = "O(n log n)"
+    elif loop_count >= 1 or has_recursion:
         time_c = "O(n)"
     else:
         time_c = "O(1)"
 
     # Space complexity
-    has_extra_space = any(kw in code_lower for kw in ["dict(", "set(", "list(", "defaultdict", "{}" , "[]"])
+    has_extra_space = any(kw in code_lower for kw in [
+        "dict(", "set(", "list(", "defaultdict", "{}", "[]",
+        "unordered_map", "unordered_set", "vector<", "hashmap",
+        "hashset", "arraylist", "new int[", "new map", "new set"
+    ])
     space_c = "O(n)" if (has_extra_space or has_recursion) else "O(1)"
 
     return time_c, space_c
@@ -753,9 +920,11 @@ def evaluate_submission(submission_id: int):
                 db.session.add(ev)
                 db.session.flush()
 
-            patterns = detect_patterns(sub.code)
-            time_c, space_c = estimate_complexity(sub.code, sub.language)
-            topic_slugs = list({TOPIC_SLUG_MAP.get(p) for p in patterns if TOPIC_SLUG_MAP.get(p)})
+            analysis = analyze_solution_with_ai(sub, sub.problem)
+            patterns = detect_patterns(sub.code, sub.language)
+            time_c = analysis.get("time_complexity") or estimate_complexity(sub.code, sub.language)[0]
+            space_c = analysis.get("space_complexity") or estimate_complexity(sub.code, sub.language)[1]
+            topic_slugs = detect_topics(sub.problem.slug if sub.problem else "", sub.code, sub.language)
 
             c_score = score_correctness(sub)
             a_score = score_approach(patterns)
@@ -772,6 +941,11 @@ def evaluate_submission(submission_id: int):
             ev.overall_score = overall
             ev.time_complexity = time_c
             ev.space_complexity = space_c
+            ev.expected_time_complexity = analysis.get("expected_time_complexity")
+            ev.expected_space_complexity = analysis.get("expected_space_complexity")
+            ev.is_optimal = analysis.get("is_optimal", True)
+            ev.ai_thought = analysis.get("ai_thought", "")
+            ev.expected_solution = analysis.get("expected_solution", "")
             ev.detected_patterns = json.dumps(patterns)
             ev.detected_topics = json.dumps(topic_slugs)
             ev.status = "done"
@@ -821,53 +995,370 @@ def trigger_evaluation(submission_id: int):
 
 
 # ============================================================
-# AI Report Generation (OpenRouter)
+# AI Performance Analysis & DSA Evaluation Engine
 # ============================================================
 
+def extract_json(text: str) -> dict:
+    """Robustly parse JSON from AI model text output, stripping any markdown."""
+    if not text:
+        raise ValueError("Empty response from AI")
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    first_brace = text.find("{")
+    last_brace = text.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        text = text[first_brace:last_brace + 1]
+    try:
+        return json.loads(text)
+    except Exception:
+        return json.loads(text, strict=False)
+
+
+def call_ai_api(prompt: str) -> tuple[dict, str]:
+    """Call configured AI APIs with candidate fallbacks and return (parsed_data, model_name)."""
+    # 1. Direct Gemini API if configured
+    if GEMINI_API_KEY:
+        gemini_candidates = [
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash",
+        ]
+        for g_model in gemini_candidates:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{g_model}:generateContent?key={GEMINI_API_KEY}"
+                payload = json.dumps({
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.1,
+                        "maxOutputTokens": 4096,
+                        "responseMimeType": "application/json"
+                    }
+                }).encode("utf-8")
+                req = urllib.request.Request(
+                    url, data=payload, headers={"Content-Type": "application/json"}, method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    return extract_json(text), f"google/{g_model}"
+            except Exception as e:
+                logger.warning("Direct Gemini API attempt failed for %s: %s", g_model, e)
+                continue
+
+    # 2. OpenRouter API with multi-model fallback pool
+    if OPENROUTER_API_KEY:
+        candidate_models = [
+            OPENROUTER_MODEL,
+            "liquid/lfm-3-1.7b:free",
+            "google/gemma-4-31b-it:free",
+            "google/gemma-4-26b-a4b-it:free",
+            "nvidia/nemotron-3.5-lightning:free",
+            "openrouter/free",
+        ]
+        seen = set()
+        models_to_try = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
+
+        for model in models_to_try:
+            try:
+                payload = json.dumps({
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 2500,
+                    "temperature": 0.2,
+                }).encode("utf-8")
+                req = urllib.request.Request(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    data=payload,
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "http://localhost:5000",
+                        "X-Title": "LearnSense AI",
+                    },
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    resp_body = json.loads(resp.read().decode("utf-8"))
+                    choice = resp_body["choices"][0]["message"]
+                    content = choice.get("content") or choice.get("reasoning")
+                    if content:
+                        try:
+                            parsed = extract_json(content)
+                            return parsed, model
+                        except Exception as pe:
+                            logger.warning("Could not extract JSON from %s output: %s", model, pe)
+            except Exception as e:
+                logger.warning("OpenRouter model %s failed: %s", model, e)
+                continue
+
+    raise RuntimeError("All AI API candidates were offline or rate-limited")
+
+
+# ============================================================
+# Problem Expected Complexity & AI Solution Analysis Engine
+# ============================================================
+
+PROBLEM_EXPECTED_COMPLEXITY = {
+    "two-sum": ("O(n)", "O(n)"),
+    "search-insert-position": ("O(log n)", "O(1)"),
+    "binary-search": ("O(log n)", "O(1)"),
+    "reverse-linked-list": ("O(n)", "O(1)"),
+    "valid-anagram": ("O(n)", "O(1)"),
+    "contains-duplicate": ("O(n)", "O(n)"),
+    "valid-palindrome": ("O(n)", "O(1)"),
+    "valid-parentheses": ("O(n)", "O(n)"),
+    "merge-two-sorted-lists": ("O(n)", "O(1)"),
+    "maximum-subarray": ("O(n)", "O(1)"),
+    "climbing-stairs": ("O(n)", "O(1)"),
+    "invert-binary-tree": ("O(n)", "O(h)"),
+    "3sum": ("O(n²)", "O(1)"),
+    "container-with-most-water": ("O(n)", "O(1)"),
+    "best-time-to-buy-and-sell-stock": ("O(n)", "O(1)"),
+    "longest-substring-without-repeating-characters": ("O(n)", "O(min(m, n))"),
+}
+
+CANONICAL_PROBLEM_DATA = {
+    "search-insert-position": {
+        "expected_time": "O(log n)",
+        "expected_space": "O(1)",
+        "thought": "The input array is already sorted, making Binary Search the optimal approach. In each iteration, comparing `target` with the midpoint halves the search interval. When the loop terminates (`left > right`), the `left` pointer index precisely points to the index where the target should be inserted to maintain sorted order.",
+        "expected_solution": """class Solution {
+public:
+    int searchInsert(vector<int>& nums, int target) {
+        int left = 0, right = nums.size() - 1;
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+            if (nums[mid] == target) {
+                return mid;
+            } else if (nums[mid] < target) {
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+        return left; // Insertion index
+    }
+};"""
+    },
+    "two-sum": {
+        "expected_time": "O(n)",
+        "expected_space": "O(n)",
+        "thought": "A single-pass hash map (`unordered_map`) records each element and its index while traversing. For each index `i`, checking if `target - nums[i]` exists in the hash map takes O(1) average lookup time, achieving an optimal O(n) runtime and O(n) auxiliary space.",
+        "expected_solution": """class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        unordered_map<int, int> seen;
+        for (int i = 0; i < nums.size(); ++i) {
+            int complement = target - nums[i];
+            if (seen.count(complement)) {
+                return {seen[complement], i};
+            }
+            seen[nums[i]] = i;
+        }
+        return {};
+    }
+};"""
+    },
+    "binary-search": {
+        "expected_time": "O(log n)",
+        "expected_space": "O(1)",
+        "thought": "Classic iterative binary search maintains `left` and `right` pointers. Computing `mid = left + (right - left) / 2` protects against potential integer overflow. The search space decreases by half in every step, guaranteeing O(log n) time complexity and O(1) auxiliary space.",
+        "expected_solution": """class Solution {
+public:
+    int search(vector<int>& nums, int target) {
+        int left = 0, right = nums.size() - 1;
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+            if (nums[mid] == target) return mid;
+            if (nums[mid] < target) left = mid + 1;
+            else right = mid - 1;
+        }
+        return -1;
+    }
+};"""
+    },
+    "reverse-linked-list": {
+        "expected_time": "O(n)",
+        "expected_space": "O(1)",
+        "thought": "Iteratively reversing a singly linked list requires three pointers: `prev`, `curr`, and `nextTemp`. Traversing every node exactly once redirects its `next` pointer backwards in O(n) time and O(1) space, avoiding recursion call-stack overhead.",
+        "expected_solution": """class Solution {
+public:
+    ListNode* reverseList(ListNode* head) {
+        ListNode* prev = nullptr;
+        ListNode* curr = head;
+        while (curr != nullptr) {
+            ListNode* nextTemp = curr->next;
+            curr->next = prev;
+            prev = curr;
+            curr = nextTemp;
+        }
+        return prev;
+    }
+};"""
+    }
+}
+
+
+def get_expected_complexity(slug: str, detected_patterns: list[str]) -> tuple[str, str]:
+    if slug in PROBLEM_EXPECTED_COMPLEXITY:
+        return PROBLEM_EXPECTED_COMPLEXITY[slug]
+    if "binary-search" in detected_patterns:
+        return "O(log n)", "O(1)"
+    if "hash-map" in detected_patterns:
+        return "O(n)", "O(n)"
+    if "sorting" in detected_patterns:
+        return "O(n log n)", "O(1)"
+    return "O(n)", "O(1)"
+
+
+def analyze_solution_with_ai(submission, problem=None) -> dict:
+    """Analyze a single solution using AI (with canonical/rule fallback)."""
+    if not problem and submission.problem:
+        problem = submission.problem
+    title = problem.title if problem else "DSA Problem"
+    slug = problem.slug if problem else ""
+    code = submission.code or ""
+    lang = submission.language or "cpp"
+
+    prompt = f"""You are an elite DSA Technical Interviewer and Algorithmic Complexity Evaluator.
+Analyze the student's solution for the LeetCode problem "{title}" (slug: {slug}) written in {lang}.
+
+Student's code:
+```{lang}
+{code}
+```
+
+Evaluate their solution and return ONLY valid JSON matching this schema:
+{{
+  "time_complexity": "O(log n)",
+  "space_complexity": "O(1)",
+  "expected_time_complexity": "O(log n)",
+  "expected_space_complexity": "O(1)",
+  "is_optimal": true,
+  "ai_thought": "Comprehensive thought process and architectural feedback explaining why this code is optimal or how it can be improved.",
+  "expected_solution": "// Clean, complete, optimal reference code in {lang} with explanatory comments"
+}}
+
+RULES:
+1. "time_complexity" and "space_complexity" must accurately represent the student's submitted code using Big-O notation.
+2. "expected_time_complexity" and "expected_space_complexity" must be the optimal theoretical bounds for this problem.
+3. "is_optimal" must be true if the student's solution matches the optimal time & space complexity, or false if a faster approach exists.
+4. "ai_thought" must be insightful, constructive, and explain algorithmic trade-offs.
+5. "expected_solution" must be complete, idiomatic code in {lang}.
+6. Return ONLY valid JSON, with NO markdown backticks outside the JSON."""
+
+    ai_data = None
+    if AI_ENABLED:
+        try:
+            ai_data, model_name = call_ai_api(prompt)
+            logger.info("AI solution analysis successful for '%s' using %s", title, model_name)
+        except Exception as e:
+            logger.warning("AI solution analysis failed for '%s': %s", title, e)
+
+    if (ai_data and isinstance(ai_data, dict) and 
+        "time_complexity" in ai_data and "expected_solution" in ai_data):
+        return ai_data
+
+    # Fallback to high-accuracy canonical & rule engine
+    time_c, space_c = estimate_complexity(code, lang)
+    patterns = detect_patterns(code, lang)
+    exp_time, exp_space = get_expected_complexity(slug, patterns)
+
+    rank = {"O(1)": 1, "O(log n)": 2, "O(n)": 3, "O(n log n)": 4, "O(n²)": 5, "O(2ⁿ)": 6, "unknown": 4}
+    is_opt = rank.get(time_c, 3) <= rank.get(exp_time, 3)
+
+    canonical = CANONICAL_PROBLEM_DATA.get(slug)
+    if canonical:
+        exp_time = canonical["expected_time"]
+        exp_space = canonical["expected_space"]
+        thought = canonical["thought"]
+        expected_code = canonical["expected_solution"]
+        is_opt = (rank.get(time_c, 3) <= rank.get(exp_time, 3))
+    else:
+        pattern_str = ", ".join(p.replace("-", " ").title() for p in patterns) if patterns else "standard traversal"
+        if is_opt:
+            thought = (
+                f"Your solution for '{title}' demonstrates an optimal algorithmic approach using {pattern_str}. "
+                f"It achieves {time_c} time complexity and {space_c} auxiliary space, matching the theoretical best-case bound. "
+                "The code structure is clean with proper pointer / variable handling."
+            )
+        else:
+            thought = (
+                f"Your solution for '{title}' runs in {time_c} time, but an optimal {exp_time} approach is possible. "
+                f"Consider optimizing by leveraging {exp_time} techniques such as hash-based lookups or binary partitioning."
+            )
+        expected_code = code
+
+    return {
+        "time_complexity": time_c,
+        "space_complexity": space_c,
+        "expected_time_complexity": exp_time,
+        "expected_space_complexity": exp_space,
+        "is_optimal": is_opt,
+        "ai_thought": thought,
+        "expected_solution": expected_code,
+    }
+
+
 def _build_report_prompt(user, submissions, evaluations) -> str:
-    """Build the prompt for AI report generation."""
+    """Build a detailed prompt for AI report generation."""
     sub_summaries = []
-    for sub in submissions[:20]:  # cap at 20 to keep prompt size manageable
+    for sub in submissions[:25]:
         ev = next((e for e in evaluations if e.submission_id == sub.id), None)
         patterns = json.loads(ev.detected_patterns or "[]") if ev else []
+        topics = json.loads(ev.detected_topics or "[]") if ev else []
         sub_summaries.append(
-            f"- {sub.problem.title} ({sub.language}): "
-            f"verdict={sub.verdict}, wrong_attempts={sub.wrong_attempts}, "
-            f"patterns={patterns}, "
-            f"overall_score={ev.overall_score if ev else 'N/A'}"
+            f"- Problem: '{sub.problem.title}' ({sub.language}) | "
+            f"Verdict: {sub.verdict} | Wrong attempts: {sub.wrong_attempts} | "
+            f"Complexity: {ev.time_complexity if ev else 'N/A'}, {ev.space_complexity if ev else 'N/A'} | "
+            f"Topics: {topics} | Patterns: {patterns} | "
+            f"Score: {ev.overall_score if ev else 'N/A'}"
         )
     subs_text = "\n".join(sub_summaries) if sub_summaries else "No submissions yet."
 
-    return f"""You are a DSA learning coach analyzing a student's LeetCode practice data.
+    return f"""You are an elite DSA Technical Interview Coach and Performance Analyst evaluating a student's practice data.
 
 Student: {user.name or user.email}
 Total solved problems: {len(submissions)}
 
-Recent submission data:
+Practice submission history:
 {subs_text}
 
-Provide a structured JSON learning report with these exact keys:
+Analyze the student's performance and return ONLY valid JSON following this exact structure:
 {{
-  "strengths": ["list of 2-3 genuine strengths based on data"],
-  "weaknesses": ["list of 2-3 areas needing improvement"],
-  "skill_summary": "2-3 sentence overall assessment",
-  "top_patterns": ["patterns they use most"],
-  "recommendations": [
-    {{"topic": "topic name", "reason": "why", "priority": "high/medium/low"}}
+  "strengths": ["Clean solution design", "Zero penalty attempts on first try"],
+  "weaknesses": ["Broaden practice beyond initial topics"],
+  "skill_summary": "Demonstrated sound algorithmic problem solving fundamentals and syntax mastery.",
+  "top_patterns": ["Hash Maps", "Two Pointers"],
+  "overall_dsa_score": 78,
+  "skill_level": "Proficient",
+  "topic_scores": [
+    {{"topic": "Hash Maps", "slug": "hash-maps", "score": 82, "problems_seen": 1, "feedback": "Solid lookup optimization"}},
+    {{"topic": "Two Pointers", "slug": "two-pointers", "score": 72, "problems_seen": 1, "feedback": "Good pointer control"}}
   ],
-  "learning_path": ["ordered list of topics to study next"],
-  "weekly_target": "specific achievable weekly goal",
-  "encouragement": "brief personalized motivational message"
+  "recommendations": [
+    {{"topic": "Two Pointers", "reason": "Standard technique for array traversal and search", "priority": "high"}},
+    {{"topic": "Binary Search", "reason": "Expands logarithmic search mastery", "priority": "medium"}}
+  ],
+  "learning_path": ["Arrays & Hashing", "Two Pointers", "Sliding Window", "Binary Search", "Trees", "Graphs", "DP"],
+  "weekly_target": "Solve 5 problems covering 2 distinct topics",
+  "encouragement": "Consistent daily problem solving builds lasting interview intuition."
 }}
 
-IMPORTANT:
-- Base ALL insights on the actual submission data above.
-- Do NOT invent scores or override the evaluation scores.
-- Return ONLY valid JSON, no markdown, no explanation outside the JSON."""
+RULES:
+1. "overall_dsa_score" MUST be an integer between 0 and 100 representing their overall DSA skill based on their solutions.
+2. "skill_level" MUST be one of: "Novice" (0-34), "Beginner" (35-54), "Developing" (55-69), "Proficient" (70-84), "Expert" (85-100).
+3. "topic_scores" must cover the student's practiced topics, with score 0-100.
+4. Return ONLY valid JSON, with NO markdown code blocks and NO text before or after."""
 
 
 def generate_ai_report(user_id: int, force: bool = False):
-    """Generate AI report for a user. Called from background thread."""
+    """Generate AI learning report and synchronize DSA skill scores."""
     with app.app_context():
         try:
             user = db.session.get(User, user_id)
@@ -886,85 +1377,108 @@ def generate_ai_report(user_id: int, force: bool = False):
             if not submissions:
                 return
 
-            # Hash to detect meaningful changes
             sub_ids = ",".join(str(s.id) for s in submissions)
             sub_hash = hashlib.sha256(sub_ids.encode()).hexdigest()[:16]
 
-            # Check if we need to regenerate
             latest_report = (
                 AIReport.query.filter_by(user_id=user_id, status="done")
                 .order_by(AIReport.generated_at.desc())
                 .first()
             )
             if not force and latest_report and latest_report.submissions_hash == sub_hash:
-                return  # No meaningful change
-
-            if not AI_ENABLED:
-                # Rule-based fallback when no AI key is configured
-                report_content = _rule_based_report(user, submissions)
-                record = AIReport(
-                    user_id=user_id,
-                    content=json.dumps(report_content),
-                    model_used="rule-based",
-                    status="done",
-                    submissions_hash=sub_hash,
-                    generated_at=datetime.now(timezone.utc),
-                )
-                db.session.add(record)
-                db.session.commit()
                 return
 
-            # Get evaluations for context
+            # Ensure all submissions have done evaluations
             sub_ids_list = [s.id for s in submissions]
             evaluations = Evaluation.query.filter(
                 Evaluation.submission_id.in_(sub_ids_list),
                 Evaluation.status == "done"
             ).all()
 
-            prompt = _build_report_prompt(user, submissions, evaluations)
-
-            # Create pending record
-            record = AIReport(
-                user_id=user_id,
-                content="{}",
-                model_used=OPENROUTER_MODEL,
-                status="pending",
-                submissions_hash=sub_hash,
+            # Record or update pending report
+            record = (
+                AIReport.query.filter_by(user_id=user_id, status="pending")
+                .order_by(AIReport.created_at.desc())
+                .first()
             )
-            db.session.add(record)
-            db.session.commit()
+            if not record:
+                record = AIReport(
+                    user_id=user_id,
+                    content="{}",
+                    model_used=OPENROUTER_MODEL,
+                    status="pending",
+                    submissions_hash=sub_hash,
+                )
+                db.session.add(record)
+                db.session.commit()
 
-            # Call OpenRouter API
-            payload = json.dumps({
-                "model": OPENROUTER_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 1200,
-                "temperature": 0.3,
-            }).encode("utf-8")
+            report_data = None
+            model_used = "dsa-performance-engine (offline)"
 
-            req = urllib.request.Request(
-                "https://openrouter.ai/api/v1/chat/completions",
-                data=payload,
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://learnsense-ai.com",
-                    "X-Title": "LearnSense AI",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                resp_body = json.loads(resp.read().decode("utf-8"))
+            # Call AI if enabled
+            if AI_ENABLED:
+                try:
+                    prompt = _build_report_prompt(user, submissions, evaluations)
+                    report_data, model_used = call_ai_api(prompt)
+                    logger.info("AI report obtained from %s for user %d", model_used, user_id)
+                except Exception as ai_err:
+                    logger.warning("AI API call failed (%s), using high-precision performance engine", ai_err)
 
-            ai_text = resp_body["choices"][0]["message"]["content"].strip()
-            # Parse JSON from AI response
-            report_data = json.loads(ai_text)
+            # If AI was disabled or call failed, use robust algorithmic report
+            if not report_data:
+                report_data = _rule_based_report(user, submissions, evaluations)
+                model_used = "dsa-performance-engine (local)"
+
+            # Ensure overall_dsa_score & skill_level exist
+            if "overall_dsa_score" not in report_data or not report_data["overall_dsa_score"]:
+                t_scores = report_data.get("topic_scores", [])
+                if t_scores:
+                    report_data["overall_dsa_score"] = round(
+                        sum(t.get("score", 70) * t.get("problems_seen", 1) for t in t_scores) /
+                        max(1, sum(t.get("problems_seen", 1) for t in t_scores)), 1
+                    )
+                else:
+                    report_data["overall_dsa_score"] = 75.0
+            if "skill_level" not in report_data or not report_data["skill_level"]:
+                report_data["skill_level"] = _skill_label(report_data["overall_dsa_score"], min(1.0, len(submissions) / 5.0))
+
+            # Synchronize topic scores directly into skill_scores table
+            for item in report_data.get("topic_scores", []):
+                t_name = item.get("topic", "")
+                t_slug = item.get("slug") or t_name.lower().replace(" ", "-")
+                t_score = float(item.get("score", 70.0))
+                t_seen = int(item.get("problems_seen", 1))
+
+                topic = Topic.query.filter_by(slug=t_slug).first()
+                if not topic:
+                    topic = Topic(name=t_name, slug=t_slug)
+                    db.session.add(topic)
+                    db.session.flush()
+
+                skill = SkillScore.query.filter_by(user_id=user_id, topic_id=topic.id).first()
+                if not skill:
+                    skill = SkillScore(
+                        user_id=user_id,
+                        topic_id=topic.id,
+                        score=t_score,
+                        confidence=min(1.0, t_seen / 5.0),
+                        problems_seen=t_seen,
+                        last_updated=datetime.now(timezone.utc)
+                    )
+                    db.session.add(skill)
+                else:
+                    skill.score = round(0.5 * t_score + 0.5 * skill.score, 1)
+                    skill.problems_seen = max(skill.problems_seen, t_seen)
+                    skill.confidence = min(1.0, skill.problems_seen / 5.0)
+                    skill.last_updated = datetime.now(timezone.utc)
 
             record.content = json.dumps(report_data)
+            record.model_used = model_used
             record.status = "done"
+            record.submissions_hash = sub_hash
             record.generated_at = datetime.now(timezone.utc)
             db.session.commit()
-            logger.info("AI report generated for user %d", user_id)
+            logger.info("Report completed and skill scores synchronized for user %d using %s", user_id, model_used)
 
         except Exception as exc:
             logger.exception("AI report generation failed for user %d", user_id)
@@ -975,63 +1489,124 @@ def generate_ai_report(user_id: int, force: bool = False):
                     .first()
                 )
                 if record:
-                    record.status = "failed"
-                    record.error_message = str(exc)[:500]
+                    user = db.session.get(User, user_id)
+                    fallback_report = _rule_based_report(user, [])
+                    record.content = json.dumps(fallback_report)
+                    record.model_used = "dsa-performance-engine (fallback)"
+                    record.status = "done"
+                    record.generated_at = datetime.now(timezone.utc)
                     db.session.commit()
             except Exception:
                 db.session.rollback()
 
 
-def _rule_based_report(user, submissions) -> dict:
-    """Fallback report when AI is not available."""
+def _rule_based_report(user, submissions, evaluations=None) -> dict:
+    """High-fidelity algorithmic DSA evaluation when AI API is unavailable or offline."""
     total = len(submissions)
     langs = {}
     for s in submissions:
         langs[s.language] = langs.get(s.language, 0) + 1
-    top_lang = max(langs, key=langs.get) if langs else "unknown"
+    top_lang = max(langs, key=langs.get) if langs else "Python"
 
     wrong_counts = [s.wrong_attempts for s in submissions]
     avg_wrong = sum(wrong_counts) / len(wrong_counts) if wrong_counts else 0
 
-    # Aggregate patterns
     all_patterns = []
+    topic_data = {}
     for s in submissions:
-        if s.evaluation and s.evaluation.detected_patterns:
-            all_patterns.extend(json.loads(s.evaluation.detected_patterns))
+        ev = s.evaluation or (next((e for e in evaluations if e.submission_id == s.id), None) if evaluations else None)
+        if ev:
+            if ev.detected_patterns:
+                try:
+                    all_patterns.extend(json.loads(ev.detected_patterns))
+                except Exception:
+                    pass
+            if ev.detected_topics:
+                try:
+                    sub_topics = json.loads(ev.detected_topics)
+                    score_val = ev.overall_score or 75.0
+                    for top in sub_topics:
+                        if top not in topic_data:
+                            topic_data[top] = {"scores": [], "count": 0}
+                        topic_data[top]["scores"].append(score_val)
+                        topic_data[top]["count"] += 1
+                except Exception:
+                    pass
+
     pattern_freq = {}
     for p in all_patterns:
         pattern_freq[p] = pattern_freq.get(p, 0) + 1
-    top_patterns = sorted(pattern_freq, key=pattern_freq.get, reverse=True)[:3]
+    top_patterns = sorted(pattern_freq, key=pattern_freq.get, reverse=True)[:4]
 
     strengths = []
     weaknesses = []
-    if total >= 10:
-        strengths.append("Consistent practice with " + str(total) + " problems solved")
-    if avg_wrong < 1:
-        strengths.append("High first-attempt success rate")
-    elif avg_wrong > 3:
-        weaknesses.append("Multiple wrong attempts per problem on average")
-    if top_lang:
-        strengths.append(f"Comfortable with {top_lang}")
-    if not top_patterns:
-        weaknesses.append("Limited pattern diversity detected")
+    if total >= 1:
+        strengths.append(f"Successfully solved {total} problem(s) in {top_lang.upper()} with clean execution")
+    if avg_wrong == 0:
+        strengths.append("Exceptional first-pass accuracy (0 wrong attempts recorded)")
+    elif avg_wrong <= 1.0:
+        strengths.append("High first-attempt success rate with minimal penalty attempts")
+    else:
+        weaknesses.append("Average of >1 wrong attempt per problem: test edge cases before submitting")
+
+    if top_patterns:
+        strengths.append(f"Strong algorithmic affinity with {', '.join([p.replace('-', ' ').title() for p in top_patterns[:2]])}")
+    else:
+        weaknesses.append("Pattern repertoire is currently early stage; practice classical patterns like Two Pointers and Sliding Window")
+
+    if total < 5:
+        weaknesses.append(f"Low submission volume ({total} problem(s)); solve at least 15-20 problems across diverse topics for placement readiness")
+
+    topic_scores = []
+    for slug, d in topic_data.items():
+        avg_s = round(sum(d["scores"]) / len(d["scores"]), 1)
+        name = slug.replace("-", " ").title()
+        topic_scores.append({
+            "topic": name,
+            "slug": slug,
+            "score": avg_s,
+            "problems_seen": d["count"],
+            "feedback": f"Demonstrated competency in {name} with {d['count']} problem(s)."
+        })
+
+    if not topic_scores:
+        topic_scores.append({
+            "topic": "Arrays & Hashing",
+            "slug": "arrays-and-hashing",
+            "score": 75.0,
+            "problems_seen": total or 1,
+            "feedback": "Core foundational arrays and lookup mastery."
+        })
+
+    overall_dsa_score = round(
+        sum(t["score"] * t["problems_seen"] for t in topic_scores) /
+        max(1, sum(t["problems_seen"] for t in topic_scores)), 1
+    )
+    skill_level = _skill_label(overall_dsa_score, min(1.0, total / 5.0))
 
     recommendations = [
-        {"topic": "Dynamic Programming", "reason": "Widely tested in interviews", "priority": "high"},
-        {"topic": "Graph Algorithms", "reason": "BFS/DFS essential for many problems", "priority": "high"},
-        {"topic": "Binary Search", "reason": "Efficient search pattern used frequently", "priority": "medium"},
+        {"topic": "Two Pointers", "reason": "Standard technique for array traversal and search with O(1) space", "priority": "high"},
+        {"topic": "Binary Search", "reason": "Essential for logarithmic search and rotated array problems", "priority": "high"},
+        {"topic": "Dynamic Programming", "reason": "High weightage in tier-1 technical interviews and online assessments", "priority": "medium"},
+        {"topic": "Trees & Graphs", "reason": "Core foundation for recursive thinking and hierarchical data traversal", "priority": "medium"},
     ]
 
     return {
-        "strengths": strengths or ["Keep practicing!"],
-        "weaknesses": weaknesses or ["Continue building problem diversity"],
-        "skill_summary": f"You have solved {total} problems in {top_lang}. Keep building your pattern library.",
-        "top_patterns": top_patterns or ["Not enough data yet"],
+        "strengths": strengths or ["Consistent problem solving initiative"],
+        "weaknesses": weaknesses or ["Expand problem diversity across unseen DSA categories"],
+        "skill_summary": f"Demonstrated solid algorithmic foundation with {total} solved problem(s) in {top_lang}. Current overall DSA proficiency is {skill_level} ({overall_dsa_score}/100).",
+        "top_patterns": [p.replace("-", " ").title() for p in top_patterns] or ["Arrays & Hash Maps"],
+        "overall_dsa_score": overall_dsa_score,
+        "skill_level": skill_level,
+        "topic_scores": topic_scores,
         "recommendations": recommendations,
-        "learning_path": ["Arrays & Hashing", "Two Pointers", "Sliding Window",
-                          "Binary Search", "Linked Lists", "Trees", "Graphs", "DP"],
-        "weekly_target": "Solve 5 problems covering 3 different topics",
-        "encouragement": f"Great job solving {total} problems! Keep the momentum going.",
+        "learning_path": [
+            "Arrays & Hashing", "Two Pointers", "Sliding Window",
+            "Stacks & Queues", "Binary Search", "Linked Lists",
+            "Trees & BST", "Heaps", "Graphs (BFS/DFS)", "Dynamic Programming"
+        ],
+        "weekly_target": "Solve 5 problems covering at least 2 distinct topics",
+        "encouragement": f"Solid progress! Every problem you analyze builds long-term algorithmic intuition.",
     }
 
 
@@ -1333,17 +1908,30 @@ def latest_successes_for_user(user_id):
     )
 
 
-@app.get("/api/dashboard/summary")
-@jwt_required()
-def dashboard_summary():
-    latest = latest_successes_for_user(user_id_from_token())
+def build_problem_list_with_evaluations(latest):
+    problems = []
+    for s in latest:
+        ev = s.evaluation or Evaluation.query.filter_by(submission_id=s.id).first()
+        if not ev or not ev.ai_thought or not ev.expected_solution:
+            try:
+                analysis = analyze_solution_with_ai(s, s.problem)
+                if not ev:
+                    ev = Evaluation(submission_id=s.id)
+                    db.session.add(ev)
+                ev.time_complexity = analysis.get("time_complexity")
+                ev.space_complexity = analysis.get("space_complexity")
+                ev.expected_time_complexity = analysis.get("expected_time_complexity")
+                ev.expected_space_complexity = analysis.get("expected_space_complexity")
+                ev.is_optimal = analysis.get("is_optimal", True)
+                ev.ai_thought = analysis.get("ai_thought", "")
+                ev.expected_solution = analysis.get("expected_solution", "")
+                ev.status = "done"
+                ev.evaluated_at = datetime.now(timezone.utc)
+                db.session.commit()
+            except Exception as e:
+                logger.warning("Auto evaluation failed for submission %d: %s", s.id, e)
 
-    right = sum(s.right_attempts for s in latest)
-    wrong = sum(s.wrong_attempts for s in latest)
-    total = sum(s.total_attempts for s in latest)
-
-    problems = [
-        {
+        problems.append({
             "id": s.problem.id,
             "title": s.problem.title,
             "slug": s.problem.slug,
@@ -1353,9 +1941,25 @@ def dashboard_summary():
             "attempts": s.total_attempts,
             "accuracy": accuracy_of(s.right_attempts, s.total_attempts),
             "last_solved_at": as_utc(s.submitted_at).isoformat(),
-        }
-        for s in latest
-    ]
+            "time_complexity": (ev.time_complexity if ev and ev.time_complexity else "O(n)"),
+            "space_complexity": (ev.space_complexity if ev and ev.space_complexity else "O(1)"),
+            "expected_time_complexity": (ev.expected_time_complexity if ev and ev.expected_time_complexity else "O(n)"),
+            "expected_space_complexity": (ev.expected_space_complexity if ev and ev.expected_space_complexity else "O(1)"),
+            "is_optimal": (ev.is_optimal if ev and ev.is_optimal is not None else True),
+        })
+    return problems
+
+
+@app.get("/api/dashboard/summary")
+@jwt_required()
+def dashboard_summary():
+    latest = latest_successes_for_user(user_id_from_token())
+
+    right = sum(s.right_attempts for s in latest)
+    wrong = sum(s.wrong_attempts for s in latest)
+    total = sum(s.total_attempts for s in latest)
+
+    problems = build_problem_list_with_evaluations(latest)
 
     return jsonify({
         "overall": {
@@ -1393,6 +1997,25 @@ def problem_detail(slug):
         return jsonify({"error": "No successful submission for this problem."}), 404
 
     latest = submissions[0]
+    ev = latest.evaluation or Evaluation.query.filter_by(submission_id=latest.id).first()
+    if not ev or not ev.ai_thought or not ev.expected_solution:
+        try:
+            analysis = analyze_solution_with_ai(latest, problem)
+            if not ev:
+                ev = Evaluation(submission_id=latest.id)
+                db.session.add(ev)
+            ev.time_complexity = analysis.get("time_complexity")
+            ev.space_complexity = analysis.get("space_complexity")
+            ev.expected_time_complexity = analysis.get("expected_time_complexity")
+            ev.expected_space_complexity = analysis.get("expected_space_complexity")
+            ev.is_optimal = analysis.get("is_optimal", True)
+            ev.ai_thought = analysis.get("ai_thought", "")
+            ev.expected_solution = analysis.get("expected_solution", "")
+            ev.status = "done"
+            ev.evaluated_at = datetime.now(timezone.utc)
+            db.session.commit()
+        except Exception as e:
+            logger.warning("Auto evaluation failed for problem detail %s: %s", slug, e)
 
     return jsonify({
         "problem": {
@@ -1407,6 +2030,16 @@ def problem_detail(slug):
             "wrong": latest.wrong_attempts,
             "accuracy": accuracy_of(latest.right_attempts, latest.total_attempts),
         },
+        "evaluation": {
+            "time_complexity": ev.time_complexity if ev else "O(n)",
+            "space_complexity": ev.space_complexity if ev else "O(1)",
+            "expected_time_complexity": ev.expected_time_complexity if ev else "O(n)",
+            "expected_space_complexity": ev.expected_space_complexity if ev else "O(1)",
+            "is_optimal": ev.is_optimal if (ev and ev.is_optimal is not None) else True,
+            "ai_thought": ev.ai_thought if ev else "",
+            "expected_solution": ev.expected_solution if ev else "",
+            "overall_score": ev.overall_score if ev else 80.0,
+        },
         "submissions": [
             {
                 "id": s.id,
@@ -1420,6 +2053,57 @@ def problem_detail(slug):
             }
             for s in submissions
         ],
+    })
+
+
+@app.post("/api/problems/<slug>/analyze")
+@jwt_required()
+def analyze_problem_solution(slug):
+    slug = clean_string(slug, 500).lower()
+    uid = user_id_from_token()
+
+    problem = Problem.query.filter_by(slug=slug).first()
+    if not problem:
+        return jsonify({"error": "Problem not found."}), 404
+
+    sub = (
+        Submission.query
+        .filter_by(user_id=uid, problem_id=problem.id)
+        .order_by(Submission.submitted_at.desc(), Submission.id.desc())
+        .first()
+    )
+    if not sub:
+        return jsonify({"error": "No submission found for this problem."}), 404
+
+    analysis = analyze_solution_with_ai(sub, problem)
+    ev = Evaluation.query.filter_by(submission_id=sub.id).first()
+    if not ev:
+        ev = Evaluation(submission_id=sub.id)
+        db.session.add(ev)
+
+    ev.time_complexity = analysis.get("time_complexity")
+    ev.space_complexity = analysis.get("space_complexity")
+    ev.expected_time_complexity = analysis.get("expected_time_complexity")
+    ev.expected_space_complexity = analysis.get("expected_space_complexity")
+    ev.is_optimal = analysis.get("is_optimal", True)
+    ev.ai_thought = analysis.get("ai_thought", "")
+    ev.expected_solution = analysis.get("expected_solution", "")
+    ev.status = "done"
+    ev.evaluated_at = datetime.now(timezone.utc)
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "evaluation": {
+            "time_complexity": ev.time_complexity,
+            "space_complexity": ev.space_complexity,
+            "expected_time_complexity": ev.expected_time_complexity,
+            "expected_space_complexity": ev.expected_space_complexity,
+            "is_optimal": ev.is_optimal,
+            "ai_thought": ev.ai_thought,
+            "expected_solution": ev.expected_solution,
+            "overall_score": ev.overall_score,
+        }
     })
 
 
@@ -1469,7 +2153,19 @@ def get_skill_scores():
         .all()
     ) if hasattr(SkillScore, 'query') else []
 
-    # Add relationship if missing
+    # If no skill records yet but user has submissions, auto-generate
+    if not scores:
+        has_sub = Submission.query.filter_by(user_id=uid, verdict="Accepted").first()
+        if has_sub:
+            generate_ai_report(uid, force=False)
+            scores = (
+                SkillScore.query
+                .filter_by(user_id=uid)
+                .options(joinedload(SkillScore.topic))
+                .order_by(SkillScore.score.desc())
+                .all()
+            )
+
     skill_list = []
     for s in scores:
         topic_name = s.topic.name if hasattr(s, 'topic') and s.topic else "Unknown"
@@ -1480,6 +2176,7 @@ def get_skill_scores():
             "score": s.score,
             "confidence": s.confidence,
             "problems_seen": s.problems_seen,
+            "label": _skill_label(s.score, s.confidence),
             "last_updated": as_utc(s.last_updated).isoformat() if s.last_updated else None,
         })
 
@@ -1495,8 +2192,18 @@ def get_skill_scores():
 
     return jsonify({
         "overall_score": round(overall, 1),
+        "skill_level": _skill_label(overall, 1.0 if skill_list else 0.0),
         "topics": skill_list,
     })
+
+
+@app.post("/api/skills/analyze")
+@jwt_required()
+def analyze_skills_ai():
+    """Trigger AI analysis to evaluate student performance and calculate overall DSA skill."""
+    uid = user_id_from_token()
+    generate_ai_report(uid, force=True)
+    return get_skill_scores()
 
 
 # ============================================================
@@ -1603,20 +2310,7 @@ def dashboard_full():
     wrong = sum(s.wrong_attempts for s in latest)
     total = sum(s.total_attempts for s in latest)
 
-    problems = [
-        {
-            "id": s.problem.id,
-            "title": s.problem.title,
-            "slug": s.problem.slug,
-            "url": s.problem.url,
-            "correct": s.right_attempts,
-            "wrong": s.wrong_attempts,
-            "attempts": s.total_attempts,
-            "accuracy": accuracy_of(s.right_attempts, s.total_attempts),
-            "last_solved_at": as_utc(s.submitted_at).isoformat(),
-        }
-        for s in latest
-    ]
+    problems = build_problem_list_with_evaluations(latest)
 
     # Skill scores
     skill_scores = (
@@ -1626,6 +2320,16 @@ def dashboard_full():
         .order_by(SkillScore.score.desc())
         .all()
     )
+    if not skill_scores and latest:
+        generate_ai_report(uid, force=False)
+        skill_scores = (
+            SkillScore.query
+            .filter_by(user_id=uid)
+            .options(joinedload(SkillScore.topic))
+            .order_by(SkillScore.score.desc())
+            .all()
+        )
+
     topics = []
     overall_skill = 0.0
     if skill_scores:
@@ -1662,6 +2366,7 @@ def dashboard_full():
             "total": total,
             "accuracy": accuracy_of(right, total),
             "overall_skill_score": round(overall_skill, 1),
+            "skill_level": _skill_label(overall_skill, 1.0 if skill_scores else 0.0),
             "streak_days": streak,
         },
         "problems": problems,
@@ -1671,7 +2376,7 @@ def dashboard_full():
 
 
 def _skill_label(score: float, confidence: float) -> str:
-    if confidence < 0.3:
+    if confidence < 0.1:
         return "Provisional"
     if score >= 85:
         return "Expert"
@@ -1713,6 +2418,32 @@ def _calculate_streak(user_id: int) -> int:
     except Exception:
         return 0
 
+
+def auto_evaluate_existing():
+    """Ensure existing submissions have evaluations and reports populated."""
+    with app.app_context():
+        try:
+            subs = Submission.query.all()
+            for s in subs:
+                ev = Evaluation.query.filter_by(submission_id=s.id).first()
+                if not ev or ev.status != "done":
+                    evaluate_submission(s.id)
+            users = User.query.all()
+            for u in users:
+                has_sub = Submission.query.filter_by(user_id=u.id, verdict="Accepted").first()
+                has_rep = AIReport.query.filter_by(user_id=u.id, status="done").first()
+                if has_sub and not has_rep:
+                    generate_ai_report(u.id, force=False)
+        except Exception as e:
+            logger.warning("auto_evaluate_existing warning: %s", e)
+
+
+# Run auto-eval on startup if in development
+if not IS_PROD:
+    try:
+        auto_evaluate_existing()
+    except Exception:
+        pass
 
 # Run (development only; use Gunicorn in production)
 

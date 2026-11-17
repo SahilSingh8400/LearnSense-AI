@@ -84,8 +84,12 @@ async function syncAccepted(entry) {
 
 async function openDashboard() {
   const stored = await getStorage(["authToken"]);
+  const dashboardRoot = API_BASE.replace(/\/api\/?$/, "");
+
   if (!stored.authToken) {
-    return { ok: false, reason: "not_logged_in" };
+    // If not logged in yet, open the local dashboard login page directly
+    await chrome.tabs.create({ url: dashboardRoot + "/extension-login.html" });
+    return { ok: true };
   }
 
   try {
@@ -93,7 +97,9 @@ async function openDashboard() {
     await chrome.tabs.create({ url: result.url });
     return { ok: true };
   } catch (error) {
-    return { ok: false, reason: error.message };
+    // Fallback: open local dashboard
+    await chrome.tabs.create({ url: dashboardRoot + "/extension-login.html" });
+    return { ok: true };
   }
 }
 

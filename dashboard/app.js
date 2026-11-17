@@ -86,21 +86,19 @@
 
       const tr = document.createElement("tr");
       tr.innerHTML =
-        '<td><button class="problem-link"></button></td><td class="good">' +
-        p.correct +
-        '</td><td class="bad">' +
-        p.wrong +
-        "</td><td>" +
-        p.attempts +
-        "</td><td>" +
-        p.accuracy +
-        '%</td><td><span class="complexity-badge ' + badgeClass + '" title="' + escapeHtml(tooltip) + '"><span class="c-dot"></span>' +
+        '<td class="col-problem"><button class="problem-link"></button></td>' +
+        '<td class="good col-num">' + p.correct + '</td>' +
+        '<td class="bad col-num">' + p.wrong + '</td>' +
+        '<td class="col-num">' + p.attempts + '</td>' +
+        '<td class="col-num">' + p.accuracy + '%</td>' +
+        '<td class="col-complexity"><span class="complexity-badge ' + badgeClass + '" title="' + escapeHtml(tooltip) + '"><span class="c-dot"></span>' +
         escapeHtml(compLabel) +
-        "</span></td><td>" +
-        fmt(p.last_solved_at) +
-        "</td>";
-      tr.querySelector("button").textContent = p.title;
-      tr.querySelector("button").onclick = () => showProblem(p.slug);
+        '</span></td>' +
+        '<td class="col-date">' + fmt(p.last_solved_at) + '</td>';
+      const btn = tr.querySelector("button");
+      btn.textContent = p.title;
+      btn.title = p.title;
+      btn.onclick = () => showProblem(p.slug);
       tbody.appendChild(tr);
     });
   }
@@ -109,6 +107,10 @@
   // Main load – Overview tab
   // ============================================================
   let cachedFullData = null;
+  let cachedUserData = null;
+  let cachedReportData = null;
+  let cachedSkillsData = null;
+  let cachedGoalsData = null;
 
   async function load() {
     if (!token()) {
@@ -118,6 +120,7 @@
     try {
       // Use /dashboard/full for richer data (skill score, streak, etc.)
       const me = await api("/me");
+      cachedUserData = me;
       if ($("user")) $("user").textContent = me.email;
 
       let data;
@@ -357,6 +360,7 @@
     if (skillsLoaded) return;
     try {
       const data = await api("/skills");
+      cachedSkillsData = data;
       skillsLoaded = true;
 
       if ($("skills-overall"))
@@ -423,6 +427,7 @@
       reportLoaded = true;
 
       if (data.status === "done" && data.report) {
+        cachedReportData = data;
         renderReport(data.report, data.generated_at, data.model);
       }
     } catch (e) {
@@ -603,6 +608,7 @@
     if (goalsLoaded) return;
     try {
       const data = await api("/goals");
+      cachedGoalsData = data;
       goalsLoaded = true;
       if (data.goal) {
         if ($("goal-type")) $("goal-type").value = data.goal.type || "general";
@@ -656,6 +662,7 @@
     try {
       await api("/report/regenerate", { method: "POST" });
       reportLoaded = false;
+      cachedReportData = null;
       if ($("report-content"))
         $("report-content").innerHTML =
           '<div class="loading-msg">AI is analyzing practice performance and generating new report...</div>';
@@ -693,6 +700,115 @@
       if (btn) {
         btn.disabled = false;
         btn.textContent = "⚡ Analyze with AI";
+      }
+    }
+  }
+
+  // ============================================================
+  // One-Tap PDF Report Download
+  // ============================================================
+  async function downloadFullReportPDF(btn) {
+    const originalHtml = btn ? btn.innerHTML : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = "⏳ Generating PDF...";
+    }
+
+    try {
+      // Ensure all data layers are fetched concurrently if not yet cached
+      const fetches = [];
+
+      if (!cachedUserData) {
+        fetches.push(
+          api("/me")
+            .then((u) => { cachedUserData = u; })
+            .catch(() => {
+              const uEl = $("user");
+              cachedUserData = { email: uEl ? uEl.textContent : "Learner" };
+            })
+        );
+      }
+
+      if (!cachedFullData) {
+        fetches.push(
+          api("/dashboard/full")
+            .then((d) => { cachedFullData = d; })
+            .catch(async () => {
+              const sum = await api("/dashboard/summary").catch(() => null);
+              if (sum) {
+                cachedFullData = {
+                  overall: { ...sum.overall, overall_skill_score: null, streak_days: 0 },
+                  problems: sum.problems || [],
+                  topics: []
+                };
+              }
+            })
+        );
+      }
+
+      if (!cachedReportData) {
+        fetches.push(
+          api("/report")
+            .then((r) => { if (r && r.status === "done") cachedReportData = r; })
+            .catch(() => {})
+        );
+      }
+
+      if (!cachedSkillsData) {
+        fetches.push(
+          api("/skills")
+            .then((s) => { cachedSkillsData = s; })
+            .catch(() => {})
+        );
+      }
+
+      if (!cachedGoalsData) {
+        fetches.push(
+          api("/goals")
+            .then((g) => { cachedGoalsData = g; })
+            .catch(() => {})
+        );
+      }
+
+      if (fetches.length) {
+        await Promise.allSettled(fetches);
+      }
+
+      const user = cachedUserData || { email: ($("user") ? $("user").textContent : "Learner") };
+      const full = cachedFullData || {};
+      const overall = full.overall || {};
+      const problems = (full.problems && full.problems.length) ? full.problems : (allProblemsData || []);
+      const topics = (cachedSkillsData && cachedSkillsData.topics) || full.topics || [];
+      const report = (cachedReportData && cachedReportData.report) || null;
+      const goals = cachedGoalsData || null;
+
+      if (!window.LearnSensePDF || !window.LearnSensePDF.generateAndDownloadReport) {
+        throw new Error("LearnSense PDF engine is initializing. Please try again in a moment.");
+      }
+
+      window.LearnSensePDF.generateAndDownloadReport({
+        user,
+        overall,
+        fullData: full,
+        report,
+        topics,
+        problems,
+        goals
+      });
+
+      if (btn) {
+        btn.innerHTML = "✅ Downloaded!";
+        setTimeout(() => {
+          btn.innerHTML = originalHtml;
+          btn.disabled = false;
+        }, 2200);
+      }
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Failed to export report PDF: " + err.message);
+      if (btn) {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
       }
     }
   }
@@ -807,6 +923,10 @@
   // ============================================================
   if ($("refresh")) $("refresh").onclick = () => {
     cachedFullData = null;
+    cachedUserData = null;
+    cachedReportData = null;
+    cachedSkillsData = null;
+    cachedGoalsData = null;
     skillsLoaded = false;
     reportLoaded = false;
     allProblemsLoaded = false;
@@ -824,6 +944,15 @@
   if ($("save-goal")) $("save-goal").onclick = saveGoal;
   if ($("regen-btn")) $("regen-btn").onclick = regenerateReport;
   if ($("skills-ai-btn")) $("skills-ai-btn").onclick = analyzeSkillsWithAI;
+
+  // One-tap PDF export buttons
+  const btnHeaderPDF = $("btn-download-pdf-header");
+  const btnHeroPDF = $("btn-download-pdf-hero");
+  const btnReportPDF = $("btn-download-pdf-report");
+
+  if (btnHeaderPDF) btnHeaderPDF.onclick = () => downloadFullReportPDF(btnHeaderPDF);
+  if (btnHeroPDF) btnHeroPDF.onclick = () => downloadFullReportPDF(btnHeroPDF);
+  if (btnReportPDF) btnReportPDF.onclick = () => downloadFullReportPDF(btnReportPDF);
 
   // Initialize direct auth if on extension-login page
   initDirectAuth();

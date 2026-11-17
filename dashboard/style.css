@@ -19,9 +19,9 @@ body {
 /* APP WRAPPER */
 .app {
   width: 100%;
-  max-width: 1440px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px 32px;
+  padding: 20px 28px;
 }
 
 /* HEADER */
@@ -131,7 +131,7 @@ header p {
 /* OVERVIEW GRID */
 .overview-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.8fr);
+  grid-template-columns: minmax(0, 1.95fr) minmax(320px, 0.9fr);
   gap: 20px;
   align-items: start;
 }
@@ -254,13 +254,37 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
-  min-width: 600px;
+  min-width: 660px;
 }
 th,
 td {
-  padding: 11px 14px;
+  padding: 10px 10px;
   text-align: left;
   border-bottom: 1px solid #1a243b;
+  white-space: nowrap;
+}
+th.col-problem,
+td.col-problem {
+  padding-left: 16px;
+  min-width: 160px;
+  max-width: 260px;
+}
+th.col-num,
+td.col-num {
+  padding: 10px 8px;
+  text-align: center;
+  min-width: 46px;
+}
+th.col-complexity,
+td.col-complexity {
+  padding: 10px 10px;
+  min-width: 145px;
+}
+th.col-date,
+td.col-date {
+  padding: 10px 18px 10px 10px;
+  min-width: 175px;
+  text-align: left;
   white-space: nowrap;
 }
 th {
@@ -302,6 +326,11 @@ tbody tr:last-child td {
   cursor: pointer;
   box-shadow: none !important;
   outline: none;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 /* Hover effect */
@@ -662,6 +691,19 @@ pre {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.report-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.hero-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 .report-header h2 {
   font-size: 18px;
@@ -866,7 +908,7 @@ pre {
 }
 
 /* RESPONSIVE */
-@media (max-width: 1100px) {
+@media (max-width: 1180px) {
   .overview-grid {
     grid-template-columns: 1fr;
   }
@@ -899,5 +941,44 @@ pre {
   }
   .report-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* PRINT STYLES FOR PHYSICAL PRINT / BROWSER PDF */
+@media print {
+  header,
+  .tabs,
+  #refresh,
+  .hero-actions,
+  .report-actions,
+  #logout,
+  #btn-download-pdf-header,
+  #btn-download-pdf-hero,
+  #btn-download-pdf-report,
+  #ai-reanalyze-btn,
+  .code-tabs-bar {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+  .app {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .panel,
+  .hero-card,
+  .scard,
+  .report-card,
+  .topic-card {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+  }
+  .tab-content {
+    display: block !important;
+    margin-bottom: 24px !important;
   }
 }

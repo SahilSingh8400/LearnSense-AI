@@ -16,6 +16,7 @@
           <p>Your personal DSA learning analytics</p>
         </div>
         <div class="header-right">
+          <button id="btn-download-pdf-header" class="primary sm" title="Download Complete Progress Report as PDF">📥 Export PDF Report</button>
           <span id="user" class="user-email">Loading...</span>
           <button id="logout" class="ghost">Logout</button>
         </div>
@@ -57,7 +58,10 @@
                     <div class="hs-val" id="accuracy-val">0%</div>
                     <div class="hs-lbl">Accuracy</div>
                   </div>
-                  <button id="refresh" class="primary sm">Refresh</button>
+                  <div class="hero-actions">
+                    <button id="refresh" class="primary sm">Refresh</button>
+                    <button id="btn-download-pdf-hero" class="ghost sm" title="Download Report as PDF">📥 Report PDF</button>
+                  </div>
                 </div>
               </div>
 
@@ -91,8 +95,13 @@
                   <table>
                     <thead>
                       <tr>
-                        <th>Problem</th><th>Correct</th><th>Wrong</th>
-                        <th>Total</th><th>Accuracy</th><th>Complexity</th><th>Last solved</th>
+                        <th class="col-problem">Problem</th>
+                        <th class="col-num">Correct</th>
+                        <th class="col-num">Wrong</th>
+                        <th class="col-num">Total</th>
+                        <th class="col-num">Accuracy</th>
+                        <th class="col-complexity">Complexity</th>
+                        <th class="col-date">Last solved</th>
                       </tr>
                     </thead>
                     <tbody id="overview-problems"></tbody>
@@ -203,7 +212,10 @@
               <h2>AI Learning Report</h2>
               <p class="muted" id="report-meta">Personalized analysis from your practice data</p>
             </div>
-            <button id="regen-btn" class="primary">Regenerate</button>
+            <div class="report-actions">
+              <button id="btn-download-pdf-report" class="primary" title="Download Complete PDF Report">📥 Download PDF Report</button>
+              <button id="regen-btn" class="ghost">Regenerate</button>
+            </div>
           </div>
           <div id="report-content">
             <div class="loading-msg" id="report-loading">Loading report...</div>
@@ -221,8 +233,13 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Problem</th><th>Correct</th><th>Wrong</th>
-                    <th>Total</th><th>Accuracy</th><th>Complexity</th><th>Last solved</th>
+                    <th class="col-problem">Problem</th>
+                    <th class="col-num">Correct</th>
+                    <th class="col-num">Wrong</th>
+                    <th class="col-num">Total</th>
+                    <th class="col-num">Accuracy</th>
+                    <th class="col-complexity">Complexity</th>
+                    <th class="col-date">Last solved</th>
                   </tr>
                 </thead>
                 <tbody id="all-problems"></tbody>
@@ -265,6 +282,7 @@
     </div>
 
     <script src="config.js"></script>
+    <script src="pdf-report.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

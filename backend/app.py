@@ -1024,11 +1024,19 @@ def call_ai_api(prompt: str) -> tuple[dict, str]:
     """Call configured AI APIs with candidate fallbacks and return (parsed_data, model_name)."""
     # 1. Direct Gemini API if configured
     if GEMINI_API_KEY:
+        gemini_model_pref = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
         gemini_candidates = [
-            "gemini-3.5-flash-lite",
-            "gemini-3.5-flash",
+            gemini_model_pref,
+            "gemini-1.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash-8b",
+            "gemini-1.5-pro",
         ]
-        for g_model in gemini_candidates:
+        # Deduplicate while preserving priority order
+        seen_g = set()
+        gemini_models_to_try = [m for m in gemini_candidates if m and not (m in seen_g or seen_g.add(m))]
+
+        for g_model in gemini_models_to_try:
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{g_model}:generateContent?key={GEMINI_API_KEY}"
                 payload = json.dumps({
@@ -1775,11 +1783,7 @@ def create_dashboard_code():
     )
     db.session.commit()
 
-    
-    return jsonify({
-    "url": f"{dashboard_url}/extension-login.html?code={raw}"
-        })
-
+    return jsonify({"url": f"{dashboard_url}/extension-login.html?code={raw}"})
 
 
 @app.post("/api/auth/exchange-dashboard-code")

@@ -236,25 +236,62 @@
     var data = await new Promise(function (resolve) {
       chrome.storage.local.get(["authToken", "user"], resolve);
     });
-    if (!data.authToken) {
-      authPanel.classList.remove("hidden");
-      appPanel.classList.add("hidden");
-      return;
-    }
-    try {
-      var result = await send({ action: "apiRequest", path: "/me" });
-      if (!result || !result.ok || !result.data) throw new Error((result && result.reason) || "Session expired");
+
+    // 1. If we have a stored token, display the user and workspace instantly!
+    if (data.authToken) {
       authPanel.classList.add("hidden");
       appPanel.classList.remove("hidden");
-      var displayName = result.data.name || result.data.email || "User";
-      userName.textContent = displayName[0].toUpperCase() + displayName.slice(1);
-      // Load skill score from backend
+      if (data.user) {
+        var cachedName = data.user.name || data.user.email || "Learner";
+        userName.textContent = cachedName[0].toUpperCase() + cachedName.slice(1);
+      }
       loadSkillScore();
-    } catch (e) {
-      await send({ action: "clearAuth" });
-      authPanel.classList.remove("hidden");
-      appPanel.classList.add("hidden");
+
+      // Silently refresh profile in background
+      try {
+        var result = await send({ action: "apiRequest", path: "/me" });
+        if (result && result.ok && result.data) {
+          var displayName = result.data.name || result.data.email || "Learner";
+          userName.textContent = displayName[0].toUpperCase() + displayName.slice(1);
+          chrome.storage.local.set({ user: result.data });
+        } else if (result && result.status === 401) {
+          // Token explicitly expired; attempt auto-login
+          var auto = await send({ action: "autoLogin" });
+          if (auto && auto.ok && auto.data && auto.data.user) {
+            var autoName = auto.data.user.name || auto.data.user.email || "Learner";
+            userName.textContent = autoName[0].toUpperCase() + autoName.slice(1);
+            loadSkillScore();
+          } else {
+            await send({ action: "clearAuth" });
+            authPanel.classList.remove("hidden");
+            appPanel.classList.add("hidden");
+          }
+        }
+      } catch (e) {
+        // Network or offline: keep user logged in with cached data
+      }
+      return;
     }
+
+    // 2. If no token yet, attempt seamless auto-login
+    try {
+      var autoLoginResult = await send({ action: "autoLogin" });
+      if (autoLoginResult && autoLoginResult.ok && autoLoginResult.data && autoLoginResult.data.access_token) {
+        authPanel.classList.add("hidden");
+        appPanel.classList.remove("hidden");
+        var usr = autoLoginResult.data.user;
+        var autoDisplayName = (usr && (usr.name || usr.email)) || "Learner";
+        userName.textContent = autoDisplayName[0].toUpperCase() + autoDisplayName.slice(1);
+        loadSkillScore();
+        return;
+      }
+    } catch (e) {
+      // Auto-login failed, show auth panel below
+    }
+
+    // 3. Fallback: Show auth panel if auto-login was not available
+    authPanel.classList.remove("hidden");
+    appPanel.classList.add("hidden");
   }
 
   function setMode(next) {
@@ -298,6 +335,7 @@
         action: "saveAuth",
         token: result.data.access_token,
         refreshToken: result.data.refresh_token,
+        user: result.data.user,
       });
       authMessage.textContent = "";
       await checkAuth();
@@ -330,14 +368,6 @@
     } catch (e) {
       syncStatus.textContent = "Dashboard: " + (e.message || "Unable to open dashboard");
     }
-  });
-
-  document.getElementById("resetBtn").addEventListener("click", function () {
-    if (!confirm("Clear local attempt history? Server data will not be deleted.")) return;
-    chrome.storage.local.set(
-      { stats: { correct: 0, wrong: 0 }, history: [], problemStats: {} },
-      loadLocal,
-    );
   });
 
   document.getElementById("copyBtn").addEventListener("click", function () {

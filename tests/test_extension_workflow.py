@@ -14,7 +14,16 @@ print("=" * 65)
 print("TESTING FULL CHROME EXTENSION <-> COMPUTER BACKEND INTEGRATION")
 print("=" * 65)
 
-# 1. EXTENSION AUTHENTICATION (Simulating extension popup login)
+# 0. EXTENSION AUTO-LOGIN (Simulating popup opening and auto-authenticating without credentials)
+print("\n[Step 0] Extension Auto-Login Verification:")
+auto_res = client.post("/api/auth/auto-login")
+assert auto_res.status_code == 200, f"Auto-login failed: {auto_res.get_json()}"
+auto_data = auto_res.get_json()
+assert "access_token" in auto_data
+assert "user" in auto_data
+print(f" -> Extension auto-login succeeded! Acquired session for: {auto_data['user']['email']}")
+
+# 1. EXTENSION AUTHENTICATION (Simulating extension popup manual login)
 print("\n[Step 1] Extension Popup Login:")
 login_res = client.post("/api/auth/login", json={
     "email": "sahil98099@gmail.com",

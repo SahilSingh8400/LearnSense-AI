@@ -1,21 +1,38 @@
+# Environments & Secrets
 .env
 .env.*
 !.env.example
 
+# Python bytecode & cache
 __pycache__/
+*.py[cod]
+*$py.class
 *.pyc
+backend/__pycache__/
+backend/migrations/**/__pycache__/
 
+# SQLite databases & instances
 *.db
 *.sqlite
 *.sqlite3
+instance/
+backend/instance/
+backend/instance/*.db
 
+# Virtual environments
 .venv/
 venv/
+ENV/
+env/
 
+# Type checking & testing cache
 .mypy_cache/
 .pytest_cache/
 
-instance/
-
-.vscode/
+# IDE & Editor settings
 .idea/
+.vscode/
+
+# OS specific files
+Thumbs.db
+.DS_Store

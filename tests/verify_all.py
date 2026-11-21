@@ -28,7 +28,11 @@ assert res_root.status_code == 200
 assert res_dash.status_code == 200
 assert res_login.status_code == 200
 
-# 3. Test Authentication
+# 3. Test Authentication (Auto-Login & Manual Login)
+auto_res = client.post("/api/auth/auto-login")
+assert auto_res.status_code == 200, f"Auto-login failed: {auto_res.get_json()}"
+print("[3a] Auto-Login Succeeded: JWT access token acquired for", auto_res.get_json()["user"]["email"])
+
 login_res = client.post("/api/auth/login", json={
     "email": "sahil98099@gmail.com",
     "password": "password123"
@@ -36,7 +40,7 @@ login_res = client.post("/api/auth/login", json={
 assert login_res.status_code == 200, f"Login failed: {login_res.get_json()}"
 token = login_res.get_json()["access_token"]
 headers = {"Authorization": f"Bearer {token}"}
-print("[3] Authentication Succeeded: JWT access token acquired")
+print("[3b] Authentication Succeeded: JWT access token acquired")
 
 # 4. Check Current Submissions
 res_summary = client.get("/api/dashboard/summary", headers=headers)

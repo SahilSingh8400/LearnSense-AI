@@ -853,6 +853,7 @@
           if (!res.ok) throw new Error(b.error || "Login failed");
           localStorage.setItem("learnsense_access_token", b.access_token);
           localStorage.setItem("learnsense_refresh_token", b.refresh_token || "");
+          window.postMessage({ type: "LEARNSENSE_DASHBOARD_AUTH" }, "*");
           showMsg("Signed in successfully! Redirecting...", false);
           setTimeout(() => location.replace("index.html"), 500);
         } catch (err) {
@@ -881,6 +882,7 @@
           if (!res.ok) throw new Error(b.error || "Registration failed");
           localStorage.setItem("learnsense_access_token", b.access_token);
           localStorage.setItem("learnsense_refresh_token", b.refresh_token || "");
+          window.postMessage({ type: "LEARNSENSE_DASHBOARD_AUTH" }, "*");
           showMsg("Account created! Redirecting...", false);
           setTimeout(() => location.replace("index.html"), 500);
         } catch (err) {
@@ -909,6 +911,7 @@
       if (!r.ok) throw new Error(b.error || "Sign-in failed");
       localStorage.setItem("learnsense_access_token", b.access_token);
       localStorage.setItem("learnsense_refresh_token", b.refresh_token || "");
+      window.postMessage({ type: "LEARNSENSE_DASHBOARD_AUTH" }, "*");
       location.replace("index.html");
     } catch (e) {
       if ($("message")) {

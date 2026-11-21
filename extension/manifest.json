@@ -31,6 +31,14 @@
       "matches": ["https://leetcode.com/problems/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost:5000/*",
+        "http://127.0.0.1:5000/*"
+      ],
+      "js": ["content-dashboard.js"],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [

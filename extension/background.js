@@ -82,14 +82,34 @@ async function syncAccepted(entry) {
   }
 }
 
+async function autoLogin() {
+  try {
+    const result = await request("/auth/auto-login", { method: "POST" });
+    if (result && result.access_token) {
+      await setStorage({
+        authToken: result.access_token,
+        refreshToken: result.refresh_token || "",
+        user: result.user || null,
+      });
+      return { ok: true, data: result };
+    }
+    return { ok: false, reason: "Invalid auto-login response" };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+}
+
 async function openDashboard() {
   const stored = await getStorage(["authToken"]);
   const dashboardRoot = API_BASE.replace(/\/api\/?$/, "");
 
   if (!stored.authToken) {
-    // If not logged in yet, open the local dashboard login page directly
-    await chrome.tabs.create({ url: dashboardRoot + "/extension-login.html" });
-    return { ok: true };
+    // If not logged in yet, try auto-login first
+    const auto = await autoLogin();
+    if (!auto.ok) {
+      await chrome.tabs.create({ url: dashboardRoot + "/extension-login.html" });
+      return { ok: true };
+    }
   }
 
   try {
@@ -114,29 +134,53 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(await openDashboard());
         return;
       }
+      if (message.action === "autoLogin") {
+        sendResponse(await autoLogin());
+        return;
+      }
       if (message.action === "apiRequest") {
-        sendResponse({
-          ok: true,
-          data: await request(message.path, message.options || {}),
-        });
+        try {
+          const data = await request(message.path, message.options || {});
+          sendResponse({ ok: true, data });
+        } catch (apiErr) {
+          sendResponse({
+            ok: false,
+            status: apiErr.status || 500,
+            reason: apiErr.message,
+          });
+        }
         return;
       }
       if (message.action === "saveAuth") {
-        await setStorage({
+        const toStore = {
           authToken: message.token,
           refreshToken: message.refreshToken || "",
-        });
+        };
+        if (message.user) {
+          toStore.user = message.user;
+          await setStorage(toStore);
+        } else {
+          await setStorage(toStore);
+          try {
+            const meData = await request("/me", {
+              headers: { Authorization: "Bearer " + message.token },
+            });
+            if (meData && (meData.email || meData.name)) {
+              await setStorage({ user: meData });
+            }
+          } catch (_) {}
+        }
         sendResponse({ ok: true });
         return;
       }
       if (message.action === "clearAuth") {
-        await removeStorage(["authToken", "refreshToken"]);
+        await removeStorage(["authToken", "refreshToken", "user"]);
         sendResponse({ ok: true });
         return;
       }
       sendResponse({ ok: false, reason: "Unknown action" });
     } catch (error) {
-      sendResponse({ ok: false, reason: error.message });
+      sendResponse({ ok: false, status: error.status || 500, reason: error.message });
     }
   })();
   return true;

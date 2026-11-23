@@ -36,3 +36,4 @@ env/
 # OS specific files
 Thumbs.db
 .DS_Store
+backend/instance/learnsense.db

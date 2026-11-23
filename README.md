@@ -124,9 +124,6 @@ LearnSense-AI/
 │   ├── popup.css             # Popup UI styling
 │   ├── popup.html            # Extension popup layout
 │   └── popup.js              # Instant workspace & session controller
-├── tests/                    # Integration & verification test suites
-│   ├── test_extension_workflow.py # End-to-end extension & API tests
-│   └── verify_all.py         # Full backend & AI diagnostic tests
 ├── .env.example              # Root environment template
 ├── .gitignore                # Clean git ignore configuration
 ├── requirements.txt          # Root Python dependencies
@@ -215,16 +212,17 @@ http://localhost:5000/
 
 ---
 
-## 🧪 Automated Testing & Verification
+## 🧪 System Health Verification
 
-Run the test suite to verify that the backend, authentication, database, auto-login, LeetCode submission ingestion, and AI diagnostics are working correctly:
+Verify that the backend API, database connection, and routing are operational:
 
 ```bash
-# 1. Verify complete backend, static dashboard routing, and AI diagnostics
-python tests/verify_all.py
-
-# 2. Verify extension auto-login, submission sync, and dashboard handoff
-python tests/test_extension_workflow.py
+# Verify API health and uptime
+curl http://localhost:5000/api/health
+```
+Response:
+```json
+{"status": "ok", "app": "LearnSense-AI"}
 ```
 
 ---

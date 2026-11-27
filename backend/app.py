@@ -62,9 +62,28 @@ APP_ENV = os.getenv("APP_ENV", os.getenv("FLASK_ENV", "development"))
 IS_PROD = APP_ENV == "production"
 
 # AI provider config (OpenRouter and Gemini direct)
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+def _is_configured_api_key(key: str) -> bool:
+    if not key or not isinstance(key, str):
+        return False
+    k = key.strip()
+    # Ignore unset or template placeholders
+    if (
+        k.lower().startswith("your_")
+        or "replace" in k.lower()
+        or "example" in k.lower()
+        or k.startswith("<")
+        or len(k) < 15
+    ):
+        return False
+    return True
+
+_raw_gemini = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_API_KEY = _raw_gemini if _is_configured_api_key(_raw_gemini) else ""
+
+_raw_openrouter = os.getenv("OPENROUTER_API_KEY", "").strip()
+OPENROUTER_API_KEY = _raw_openrouter if _is_configured_api_key(_raw_openrouter) else ""
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "liquid/lfm-3-1.7b:free")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
 AI_ENABLED = bool(OPENROUTER_API_KEY or GEMINI_API_KEY)
 
 
@@ -1047,8 +1066,12 @@ def call_ai_api(prompt: str) -> tuple[dict, str]:
                         "responseMimeType": "application/json"
                     }
                 }).encode("utf-8")
+                headers = {
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": GEMINI_API_KEY,
+                }
                 req = urllib.request.Request(
-                    url, data=payload, headers={"Content-Type": "application/json"}, method="POST"
+                    url, data=payload, headers=headers, method="POST"
                 )
                 with urllib.request.urlopen(req, timeout=6) as resp:
                     data = json.loads(resp.read().decode("utf-8"))

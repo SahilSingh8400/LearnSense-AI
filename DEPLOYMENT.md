@@ -85,7 +85,7 @@ Before starting, ensure you have:
 
 1. **A GitHub Account**:
    - The LearnSense AI repository pushed to your personal GitHub account (either public or private).
-   - Verify that your repo includes the [`backend/`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/backend), [`dashboard/`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/dashboard), and [`extension/`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension) folders.
+   - Verify that your repo includes the [`backend/`](./backend), [`dashboard/`](./dashboard), and [`extension/`](./extension) folders.
 2. **A Render Account**:
    - Sign up at [render.com](https://render.com) using your GitHub account (free tier works great!).
 3. **A Chromium-based Browser**:
@@ -118,7 +118,7 @@ Render provides a managed PostgreSQL database that integrates directly with web 
 ---
 
 ### Step 2.2: Create the Web Service
-Now, deploy the Python application inside [`backend/`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/backend).
+Now, deploy the Python application inside [`backend/`](./backend).
 
 1. In Render, click **New +** and select **Web Service**.
 2. Select **Build and deploy from a Git repository** and connect your GitHub account.
@@ -205,7 +205,7 @@ Before deploying, scroll down to the **Environment Variables** section and add t
 
 ## 📊 Section 3: Deploy the Dashboard on Render
 
-The dashboard is located in [`dashboard/`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/dashboard). It consists of pure, lightweight HTML, CSS, and modern JavaScript with **zero build step** (no Webpack, Vite, or npm required).
+The dashboard is located in [`dashboard/`](./dashboard). It consists of pure, lightweight HTML, CSS, and modern JavaScript with **zero build step** (no Webpack, Vite, or npm required).
 
 ### Step 3.1: Create the Static Site
 1. In your [Render Dashboard](https://dashboard.render.com/), click **New +** and select **Static Site**.
@@ -242,13 +242,13 @@ The dashboard is located in [`dashboard/`](file:///c:/Users/Sahil/Downloads/Lear
 ### Step 3.2: Configure Dashboard API URL Auto-Detection
 The dashboard needs to know where your backend API lives. You can either hardcode the backend URL or use auto-detection.
 
-Open [`dashboard/config.js`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/dashboard/config.js). By default it contains:
+Open [`dashboard/config.js`](./dashboard/config.js). By default it contains:
 ```javascript
 // Change this ONE value after deploying the Flask backend.
 window.LEARNSENSE_API_BASE = 'http://localhost:5000/api';
 ```
 
-Replace the contents of [`dashboard/config.js`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/dashboard/config.js) with this smart auto-detecting snippet:
+Replace the contents of [`dashboard/config.js`](./dashboard/config.js) with this smart auto-detecting snippet:
 
 ```javascript
 // LearnSense AI - Dashboard API Configuration
@@ -291,7 +291,7 @@ Now that you have your real dashboard URL (e.g., `https://learnsense-dashboard.o
 The Chrome extension needs permission to communicate with your live Render backend instead of `localhost`.
 
 ### Step 4.1: Update Extension API Base URL
-1. Open [`extension/config.js`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension/config.js) in your code editor.
+1. Open [`extension/config.js`](./extension/config.js) in your code editor.
 2. Update `self.LEARNSENSE_API_BASE` to point to your live Render backend URL ending in `/api`:
 
 ```javascript
@@ -306,7 +306,7 @@ self.LEARNSENSE_API_BASE = 'https://learnsense-api.onrender.com/api';
 ### Step 4.2: Update Manifest Host Permissions
 Chrome MV3 requires extensions to explicitly declare all domains they communicate with.
 
-1. Open [`extension/manifest.json`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension/manifest.json).
+1. Open [`extension/manifest.json`](./extension/manifest.json).
 2. Locate the `"host_permissions"` array (lines 7–11):
    ```json
    "host_permissions": [
@@ -385,8 +385,8 @@ You have two paths to share LearnSense AI with friends, study groups, or the pub
 Ideal for sharing with classmates or friends without paying Google's developer registration fee.
 
 #### 1. Prepare the ZIP Archive:
-1. Ensure [`extension/config.js`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension/config.js) has your live Render API URL (`https://learnsense-api.onrender.com/api`).
-2. Ensure [`extension/manifest.json`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension/manifest.json) includes `https://YOUR-APP.onrender.com/*` in `host_permissions`.
+1. Ensure [`extension/config.js`](./extension/config.js) has your live Render API URL (`https://learnsense-api.onrender.com/api`).
+2. Ensure [`extension/manifest.json`](./extension/manifest.json) includes `https://YOUR-APP.onrender.com/*` in `host_permissions`.
 3. Open Windows Explorer, right-click the `extension` folder, and choose:
    **Send to ➔ Compressed (zipped) folder** (or use 7-Zip / WinRAR).
 4. Name the file `LearnSense-AI-v2.0.0.zip`.
@@ -412,7 +412,7 @@ Publishing to the Chrome Web Store gives you an official store listing, automati
 3. Pay the one-time **$5 USD** developer registration fee.
 
 #### Step 2: Package the Extension ZIP
-1. Verify the production configuration in [`extension/config.js`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension/config.js).
+1. Verify the production configuration in [`extension/config.js`](./extension/config.js).
 2. Remove any test comments or temporary code.
 3. Select all files **inside** the `extension` folder:
    - `manifest.json`
@@ -435,7 +435,7 @@ Publishing to the Chrome Web Store gives you an official store listing, automati
      - **Summary**: Tracks LeetCode practice attempts and delivers detailed analytics on a hosted dashboard.
      - **Category**: *Productivity* or *Developer Tools*
    - **Graphic Assets**:
-     - **Store Icon**: 128x128 PNG (use [`extension/icons/icon128.png`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension/icons/icon128.png))
+     - **Store Icon**: 128x128 PNG (use [`extension/icons/icon128.png`](./extension/icons/icon128.png))
      - **Screenshots**: At least one 1280x800 or 640x400 screenshot showing the popup stats and the hosted dashboard.
      - **Small Tile Promo**: 440x280 PNG.
    - **Privacy Practices**:
@@ -506,7 +506,7 @@ Here is the everyday workflow for using LearnSense AI:
 ### 3. Build Fails with Encoding or Dependency Errors
 - **Symptom**: `UnicodeDecodeError` or package resolution failure during `pip install`.
 - **Fix**:
-  - Ensure [`backend/requirements.txt`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/backend/requirements.txt) is saved with **UTF-8** encoding without BOM.
+  - Ensure [`backend/requirements.txt`](./backend/requirements.txt) is saved with **UTF-8** encoding without BOM.
   - Verify that the Python runtime in Render is set to **Python 3**.
 
 ---
@@ -514,10 +514,10 @@ Here is the everyday workflow for using LearnSense AI:
 ### 4. Extension Cannot Connect to API ("Failed to fetch" / Network Error)
 - **Symptom**: The popup shows "Unable to reach server" or network error in the extension console.
 - **Checklist**:
-  1. Did you include `/api` at the end of `LEARNSENSE_API_BASE` in [`extension/config.js`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension/config.js)?
+  1. Did you include `/api` at the end of `LEARNSENSE_API_BASE` in [`extension/config.js`](./extension/config.js)?
      - ✅ Correct: `https://learnsense-api.onrender.com/api`
      - ❌ Incorrect: `https://learnsense-api.onrender.com`
-  2. Did you add your backend domain to [`extension/manifest.json`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension/manifest.json)?
+  2. Did you add your backend domain to [`extension/manifest.json`](./extension/manifest.json)?
      - Ensure `"https://learnsense-api.onrender.com/*"` is in `"host_permissions"`.
   3. Did you reload the extension? Go to `chrome://extensions/` and click the **Reload icon (🔄)** on the LearnSense card.
 
@@ -531,7 +531,7 @@ Here is the everyday workflow for using LearnSense AI:
     DASHBOARD_ORIGIN = https://learnsense-dashboard.onrender.com
     ```
   - **No trailing slash**: `https://learnsense-dashboard.onrender.com/` will cause CORS mismatches!
-  - Note: Chrome extensions send requests with origin `chrome-extension://<id>`. The backend [`app.py`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/backend/app.py) handles extension origins automatically via regex in `handle_cors_for_extensions`.
+  - Note: Chrome extensions send requests with origin `chrome-extension://<id>`. The backend [`app.py`](./backend/app.py) handles extension origins automatically via regex in `handle_cors_for_extensions`.
 
 ---
 
@@ -543,7 +543,7 @@ Here is the everyday workflow for using LearnSense AI:
      DASHBOARD_URL = https://learnsense-dashboard.onrender.com
      ```
   2. Dashboard codes expire after **2 minutes**. If a code was already used or expired, close the tab and click **View Dashboard** again in the popup to issue a fresh code.
-  3. Ensure [`dashboard/config.js`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/dashboard/config.js) is pointing to your Render backend API URL and not `localhost`.
+  3. Ensure [`dashboard/config.js`](./dashboard/config.js) is pointing to your Render backend API URL and not `localhost`.
 
 ---
 
@@ -562,9 +562,10 @@ Before sharing your project or showing it off, tick off this final checklist:
 - [ ] Health check returns `{"ok": true, "database": "connected"}` at `/api/health`.
 - [ ] Static Dashboard deployed on Render.
 - [ ] Backend `DASHBOARD_ORIGIN` and `DASHBOARD_URL` updated with the dashboard URL.
-- [ ] [`dashboard/config.js`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/dashboard/config.js) configured with the Render API URL.
-- [ ] [`extension/config.js`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension/config.js) and [`extension/manifest.json`](file:///c:/Users/Sahil/Downloads/LearnSense-AI-Full-Implementation-v2/extension/manifest.json) updated for production.
+- [ ] [`dashboard/config.js`](./dashboard/config.js) configured with the Render API URL.
+- [ ] [`extension/config.js`](./extension/config.js) and [`extension/manifest.json`](./extension/manifest.json) updated for production.
 - [ ] Extension loaded in Chrome Developer Mode and test login succeeded.
 - [ ] LeetCode problem solved, and dashboard displays the accepted solution!
 
 🎉 **Congratulations! LearnSense AI is fully deployed and ready to track your algorithmic journey!**
+

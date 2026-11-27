@@ -131,10 +131,10 @@ Expected output:
 
 ## 🌐 Production Deployment
 
-To deploy LearnSense AI to production (Render, Railway, Heroku, etc.), check out the step-by-step guide in [DEPLOYMENT.md](file:///c:/Users/Sahil/Desktop/LearnSense-AI/DEPLOYMENT.md).
+To deploy LearnSense AI to production (Render, Railway, Heroku, etc.), check out the step-by-step guide in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE.md](file:///c:/Users/Sahil/Desktop/LearnSense-AI/LICENSE.md) file for details.
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.

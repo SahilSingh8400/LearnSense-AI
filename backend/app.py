@@ -1702,38 +1702,11 @@ def login():
 
 
 @app.route("/api/auth/auto-login", methods=["GET", "POST"])
-@limiter.limit("30 per minute")
 def auto_login():
-    """Seamless auto-login for Chrome Extension & local dashboard.
-    Returns existing active user session, or auto-initializes the default learner account.
+    """Auto-login is disabled for security and multi-user data isolation.
+    Users must authenticate through /api/auth/login or /api/auth/register.
     """
-    body = json_body() if (request.is_json and request.method == "POST") else {}
-    target_email = clean_string(body.get("email"), 255).lower() if body else ""
-
-    if target_email:
-        user = User.query.filter_by(email=target_email).first()
-    else:
-        user = User.query.order_by(User.id.asc()).first()
-
-    if not user:
-        # Create default learner user for seamless first-time onboarding
-        default_email = target_email or "sahil98099@gmail.com"
-        user = User(
-            email=default_email,
-            name="Sahil",
-            password_hash=generate_password_hash("password123"),
-        )
-        db.session.add(user)
-        try:
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            user = User.query.first()
-
-    if not user:
-        return jsonify({"error": "Unable to initialize user account."}), 500
-
-    return jsonify({**issue_tokens(user.id), "user": user_json(user)})
+    return jsonify({"error": "Auto-login is disabled. Please sign in or create an account."}), 400
 
 
 

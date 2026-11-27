@@ -941,6 +941,9 @@
     $("logout").onclick = function () {
       localStorage.removeItem("learnsense_access_token");
       localStorage.removeItem("learnsense_refresh_token");
+      try {
+        window.postMessage({ type: "LEARNSENSE_DASHBOARD_LOGOUT" }, "*");
+      } catch (e) {}
       location.href = "extension-login.html";
     };
 

@@ -82,34 +82,13 @@ async function syncAccepted(entry) {
   }
 }
 
-async function autoLogin() {
-  try {
-    const result = await request("/auth/auto-login", { method: "POST" });
-    if (result && result.access_token) {
-      await setStorage({
-        authToken: result.access_token,
-        refreshToken: result.refresh_token || "",
-        user: result.user || null,
-      });
-      return { ok: true, data: result };
-    }
-    return { ok: false, reason: "Invalid auto-login response" };
-  } catch (err) {
-    return { ok: false, reason: err.message };
-  }
-}
-
 async function openDashboard() {
   const stored = await getStorage(["authToken"]);
   const dashboardRoot = API_BASE.replace(/\/api\/?$/, "");
 
   if (!stored.authToken) {
-    // If not logged in yet, try auto-login first
-    const auto = await autoLogin();
-    if (!auto.ok) {
-      await chrome.tabs.create({ url: dashboardRoot + "/extension-login.html" });
-      return { ok: true };
-    }
+    await chrome.tabs.create({ url: dashboardRoot + "/extension-login.html" });
+    return { ok: true };
   }
 
   try {
@@ -117,7 +96,7 @@ async function openDashboard() {
     await chrome.tabs.create({ url: result.url });
     return { ok: true };
   } catch (error) {
-    // Fallback: open local dashboard
+    // Fallback: open local dashboard login
     await chrome.tabs.create({ url: dashboardRoot + "/extension-login.html" });
     return { ok: true };
   }
@@ -132,10 +111,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       if (message.action === "openDashboard") {
         sendResponse(await openDashboard());
-        return;
-      }
-      if (message.action === "autoLogin") {
-        sendResponse(await autoLogin());
         return;
       }
       if (message.action === "apiRequest") {
@@ -174,7 +149,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
       if (message.action === "clearAuth") {
-        await removeStorage(["authToken", "refreshToken", "user"]);
+        await removeStorage([
+          "authToken",
+          "refreshToken",
+          "user",
+          "stats",
+          "history",
+          "problemStats",
+        ]);
         sendResponse({ ok: true });
         return;
       }

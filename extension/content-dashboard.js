@@ -19,13 +19,29 @@
     }
   }
 
+  function clearAuthFromExtension() {
+    try {
+      if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({ action: "clearAuth" });
+      }
+    } catch (e) {
+      // Storage access or extension context invalidated
+    }
+  }
+
   // Sync on page load if logged in
-  syncAuthToExtension();
+  if (localStorage.getItem("learnsense_access_token")) {
+    syncAuthToExtension();
+  }
 
   // Listen for storage events (e.g. login/logout in dashboard)
   window.addEventListener("storage", function (e) {
-    if (e.key === "learnsense_access_token" && e.newValue) {
-      syncAuthToExtension();
+    if (e.key === "learnsense_access_token") {
+      if (e.newValue) {
+        syncAuthToExtension();
+      } else {
+        clearAuthFromExtension();
+      }
     }
   });
 
@@ -34,6 +50,8 @@
     if (event.source !== window || !event.data) return;
     if (event.data.type === "LEARNSENSE_DASHBOARD_AUTH") {
       syncAuthToExtension();
+    } else if (event.data.type === "LEARNSENSE_DASHBOARD_LOGOUT") {
+      clearAuthFromExtension();
     }
   });
 })();
